@@ -449,8 +449,25 @@ a{color:var(--green-dark)}
     </div>
 
     <div class="card">
-      <h3>הנתונים שלך</h3>
-      <p class="note">כל הצמחים, הטיפולים ותוכנית ההשקיה נשמרים בדפדפן של הטלפון הזה בלבד. מחיקת נתוני הדפדפן תמחק גם את נתוני האפליקציה, כך שכדאי לא לנקות אותם.</p>
+      <h3>גיבוי ושחזור</h3>
+      <p class="note">כל הצמחים, הטיפולים ותוכנית ההשקיה נשמרים בדפדפן של הטלפון הזה בלבד. מומלץ לייצא גיבוי מדי פעם — אם מחליפים טלפון או מנקים נתוני דפדפן, אפשר לשחזר הכול מהקובץ.</p>
+      <div class="btn-row">
+        <button class="btn" id="backupExport">ייצא גיבוי</button>
+        <button class="btn secondary" id="backupImportBtn">ייבא גיבוי</button>
+      </div>
+      <input type="file" class="hidden-input" id="backupImport" accept="application/json,.json">
+      <p class="note" id="backupStatus" style="margin-top:10px"></p>
+    </div>
+
+    <div class="card" id="syncCard" style="display:none">
+      <h3>סנכרון ענן</h3>
+      <p class="note">סנכרון אוטומטי של הנתונים לענן — זמין בכל מכשיר, עם גיבוי אוטומטי.</p>
+      <div class="status-line"><span class="dot" id="syncDot"></span><span id="syncStatus">לא מחובר</span></div>
+      <div class="btn-row">
+        <button class="btn" id="syncSignIn">התחבר עם גוגל</button>
+        <button class="btn secondary" id="syncSignOut" style="display:none">התנתק</button>
+      </div>
+      <p class="note" id="syncInfo" style="margin-top:10px"></p>
     </div>
   </section>
 </main>
@@ -1114,6 +1131,37 @@ async function identifyFromDataURL(dataURL){
   }
 }
 
+/* ================= גיבוי ושחזור ================= */
+function exportBackup(){
+  try{
+    const payload = { app:'plant-tracker', version:1, exportedAt:new Date().toISOString(), data: state };
+    const blob = new Blob([JSON.stringify(payload)], { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'plant-tracker-backup-' + todayStr() + '.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 800);
+    $('backupStatus').textContent = 'הגיבוי יוצא בהצלחה. שמרו את הקובץ במקום בטוח.';
+  }catch(e){ toast('ייצוא הגיבוי נכשל'); }
+}
+function importBackupFile(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const payload = JSON.parse(reader.result);
+      const data = (payload && payload.data) ? payload.data : payload;
+      if(!data || !Array.isArray(data.plants)) throw new Error('bad backup');
+      if(!confirm('לייבא את הגיבוי? הנתונים הנוכחיים באפליקציה יוחלפו בנתוני הגיבוי.')) return;
+      state = Object.assign(defaultState(), data);
+      save(); renderAll();
+      $('backupStatus').textContent = 'הגיבוי יובא בהצלחה (' + state.plants.length + ' צמחים).';
+      toast('הגיבוי שוחזר');
+    }catch(e){ toast('קובץ הגיבוי לא תקין'); }
+  };
+  reader.onerror = () => toast('לא הצלחתי לקרוא את הקובץ');
+  reader.readAsText(file);
+}
+
 /* ================= התראות ================= */
 const VAPID_PUBLIC_KEY = 'BF7i7WQHWwjhvzcuDrx5XjIvKt6QP9s0Kq9Mqc4S8oxoASTR5tGGP_w8i_1F0Rn75ZcrzPFCKUHP5B_Tn53ron4';
 function urlB64ToUint8Array(base64String){
@@ -1290,6 +1338,15 @@ $('notifCopy').addEventListener('click', async () => {
     try{ document.execCommand('copy'); toast('הקוד הועתק'); }
     catch(e2){ toast('אפשר להעתיק את הקוד ידנית מהתיבה'); }
   }
+});
+
+/* גיבוי */
+$('backupExport').addEventListener('click', exportBackup);
+$('backupImportBtn').addEventListener('click', () => $('backupImport').click());
+$('backupImport').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if(f) importBackupFile(f);
 });
 
 /* ================= אתחול ================= */
