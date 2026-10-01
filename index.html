@@ -561,6 +561,9 @@ a{color:var(--green-dark)}
       <button class="btn" id="d_markFert" style="background:var(--orange);box-shadow:0 6px 16px rgba(255,138,61,.30)">דישנתי היום</button>
     </div>
     <div class="btn-row">
+      <button class="btn secondary" id="d_diagnose">אבחן בעיה</button>
+    </div>
+    <div class="btn-row">
       <button class="btn secondary" id="d_edit">עריכה</button>
       <button class="btn danger" id="d_delete">מחיקת הצמח</button>
     </div>
@@ -592,6 +595,43 @@ a{color:var(--green-dark)}
     </div>
   </div>
 </div>
+
+<!-- ================= DIAGNOSIS MODAL ================= -->
+<div class="modal-backdrop" id="diagModal">
+  <div class="modal">
+    <button class="close-x" data-close="diagModal">✕</button>
+    <h2>אבחון בעיה</h2>
+    <p class="note" id="diagPlantName"></p>
+    <div id="diagSteps">
+      <div class="diag-step" data-step="1">
+        <h3 style="font-size:16px">שלב 1 — צלמו את האזור הבעייתי</h3>
+        <p class="note">תמונה קרובה וברורה של העלים או האזור הפגוע. לא חובה, אבל עוזר לעקוב אחרי הבעיה ביומן.</p>
+        <div class="form-photo" id="dg_preview" style="margin-bottom:14px"></div>
+        <div class="btn-row" style="margin:0 0 14px">
+          <button class="btn secondary" id="dg_photoBtn">בחר / צלם תמונה</button>
+        </div>
+      </div>
+      <div class="diag-step" data-step="2" style="display:none">
+        <h3 style="font-size:16px">שלב 2 — איפה הבעיה?</h3>
+        <div class="radio-row" id="dg_locations" style="flex-direction:column;align-items:stretch;gap:8px"></div>
+      </div>
+      <div class="diag-step" data-step="3" style="display:none">
+        <h3 style="font-size:16px">שלב 3 — מה רואים על הצמח?</h3>
+        <p class="note">סמנו את כל מה שמתאים.</p>
+        <div id="dg_symptoms" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+      <div class="diag-step" data-step="4" style="display:none">
+        <h3 style="font-size:16px">תוצאות האבחון</h3>
+        <div id="dg_results"></div>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="btn secondary" id="dg_back" style="display:none">חזרה</button>
+      <button class="btn" id="dg_next">המשך</button>
+    </div>
+  </div>
+</div>
+<input type="file" class="hidden-input" id="diagPhotoInput" accept="image/*">
 
 <!-- ================= COMPARE MODAL ================= -->
 <div class="modal-backdrop" id="compareModal">
@@ -1148,10 +1188,235 @@ function openDetail(plantId){
     ? '<p class="note">עדיין לא נרשמו טיפולים לצמח הזה.</p>'
     : hist.slice(0, 30).map(h => {
         const d = new Date(h.at);
-        return '<div class="history-item"><span>' + (h.type === 'water' ? '<span class="chip auto">השקיה</span>' : '<span class="chip due">דישון</span>') + '</span><span class="note">' + new Intl.DateTimeFormat('he-IL',{day:'numeric',month:'numeric',year:'numeric'}).format(d) + '</span></div>';
+        const chip = h.type === 'water' ? '<span class="chip auto">השקיה</span>'
+          : h.type === 'fert' ? '<span class="chip due">דישון</span>'
+          : '<span class="chip over">אבחון</span>';
+        const extra = h.type === 'diagnosis' && h.label ? ' · ' + esc(h.label) : '';
+        return '<div class="history-item"><span>' + chip + '</span><span class="note">' + new Intl.DateTimeFormat('he-IL',{day:'numeric',month:'numeric',year:'numeric'}).format(d) + extra + '</span></div>';
       }).join('');
   renderJournal(p);
   openModal('detailModal');
+}
+
+/* ================= אבחון בעיות ================= */
+const DIAG_LOCATIONS = [
+  { id:'leaves', text:'עלים' },
+  { id:'stems', text:'גבעולים וענפים' },
+  { id:'roots', text:'בסיס הצמח / שורשים' },
+  { id:'flowers', text:'פרחים / פירות' },
+  { id:'whole', text:'כל הצמח' }
+];
+const DIAG_SYMPTOMS = [
+  { id:'yellowing', text:'עלים מצהיבים' },
+  { id:'brown_spots', text:'כתמים חומים או שחורים' },
+  { id:'white_powder', text:'אבקה לבנה על העלים' },
+  { id:'white_fluff', text:'צמר לבן דביק (כמו צמר גפן)' },
+  { id:'wilting', text:'קמילה / נבילה' },
+  { id:'dry_edges', text:'קצוות עלים יבשים וחומים' },
+  { id:'bugs_visible', text:'חרקים קטנים נראים לעין' },
+  { id:'sticky', text:'עלים דביקים או טיפות דביקות' },
+  { id:'webbing', text:'קורים דקים על העלים' },
+  { id:'deformed_leaves', text:'עלים מעוותים, מסולסלים או קטנים' },
+  { id:'leaf_drop', text:'נשירת עלים' },
+  { id:'mushy_stem', text:'גבעול או בסיס רך ומימי' },
+  { id:'slow_growth', text:'צמיחה איטית או עצורה' },
+  { id:'holes', text:'חורים או כרסומים בעלים' }
+];
+const DIAG_PROBLEMS = [
+  { id:'aphids', name:'כנימות עלים', kind:'מזיק',
+    locations:['leaves','stems','flowers'], symptoms:['bugs_visible','deformed_leaves','sticky','yellowing','slow_growth'],
+    desc:'חרקים קטנים ורכים (ירוקים, שחורים או לבנים) שמתקבצים על עלים צעירים וניצנים ומוצצים את מוהל הצמח.',
+    treatment:['שטפו את הצמח בזרם מים חזק, בדגש על צדדי העלים התחתונים.','רססו תמיסת סבון כלים מדוללת (כפית לליטר מים) פעם בשבוע עד שהכנימות נעלמות.','במקרה עקשני — שמן נים או תכשיר ייעודי נגד כנימות לפי הוראות היצרן.'],
+    prevention:'בדקו עלים צעירים פעם בשבוע. צמחים חדשים — בודדו לשבוע לפני שמצרפים לגינה.' },
+  { id:'spider_mites', name:'אקרית הקורים', kind:'מזיק',
+    locations:['leaves'], symptoms:['webbing','yellowing','dry_edges','slow_growth','leaf_drop'],
+    desc:'עכבישישים זעירים (כמעט בלתי נראים) שטווים קורים דקים בצד התחתון של העלים וגורמים לנקודות צהובות.',
+    treatment:['שטפו היטב את העלים במים, כולל הצד התחתון.','העלו לחות סביב הצמח — האקרית שונאת לחות.','רססו שמן נים או סבון חרקים פעם בשבוע. בודדו את הצמח הנגוע.'],
+    prevention:'נגבו אבק מהעלים מדי פעם. באזורים יבשים — רססו מים סביב הצמח.' },
+  { id:'mealybugs', name:'כנימה קמחית', kind:'מזיק',
+    locations:['leaves','stems'], symptoms:['white_fluff','sticky','yellowing','slow_growth'],
+    desc:'גושים לבנים צמריריים במפרקי העלים ובתי השחי של הצמח. מוצצת מוהל ומפרישה טל דבש דביק.',
+    treatment:['הסירו כל גוש עם מקלון אוזניים טבול באלכוהול 70%.','רססו שמן נים על כל הצמח, כולל מפרקים.','במקרה חמור — גזמו ושמידו חלקים נגועים קשה.'],
+    prevention:'בדקו צמחים חדשים היטב לפני הכנסה הביתה. אוורור טוב מרתיע התפשטות.' },
+  { id:'scale', name:'כנימת מגן', kind:'מזיק',
+    locations:['stems','leaves'], symptoms:['bugs_visible','sticky','yellowing','slow_growth'],
+    desc:'בליטות קטנות, חומות וקשות על גבעולים ועלים — הכנימה מוגנת ב"שריון" ולכן קשה להדברה בריסוס בלבד.',
+    treatment:['גרדו בעדינות כל כנימה עם ציפורן או מברשת רכה.','מרחו שמן נים או שמן גנני על האזורים הנגועים.','חזרו על הטיפול פעם בשבוע במשך חודש.'],
+    prevention:'בדיקה תקופתית של גבעולים, במיוחד בצמחי בית.' },
+  { id:'powdery_mildew', name:'קמחון', kind:'מחלה פטרייתית',
+    locations:['leaves','stems'], symptoms:['white_powder','yellowing','deformed_leaves'],
+    desc:'שכבת אבקה לבנה על העלים. נפוץ בלחות גבוהה, צפיפות ואוורור לקוי.',
+    treatment:['הסירו עלים נגועים קשה והשמידו אותם (לא לקומפוסט).','רססו תמיסת סודה לשתייה — כפית לליטר מים + טיפת סבון כלים.','שפרו אוורור סביב הצמח. במקרה חמור — קוטל פטריות ייעודי.'],
+    prevention:'הימנעו מהרטבת העלים בהשקיה. שמרו מרווח בין צמחים.' },
+  { id:'leaf_spot', name:'כתמי עלים פטרייתיים', kind:'מחלה פטרייתית',
+    locations:['leaves'], symptoms:['brown_spots','yellowing','leaf_drop'],
+    desc:'כתמים חומים או שחורים, לעיתים עם הילה צהובה, שמתפשטים בתנאי לחות.',
+    treatment:['הסירו עלים נגועים והשמידו אותם — לא להשאיר על האדמה.','השקו רק בבסיס הצמח, לא על העלים.','במקרה מתפשט — קוטל פטריות ייעודי לפי ההוראות.'],
+    prevention:'השקיה בבוקר בבסיס הצמח. אוורור טוב ומרווח בין צמחים.' },
+  { id:'root_rot', name:'ריקבון שורשים', kind:'מחלה מטיפול לקוי',
+    locations:['roots','whole'], symptoms:['wilting','yellowing','mushy_stem','slow_growth','leaf_drop'],
+    desc:'שורשים נרקבים מעודף מים וחוסר ניקוז. סימן אופייני: הצמח נבול למרות שהאדמה רטובה.',
+    treatment:['הוציאו את הצמח מהעציץ ובדקו שורשים — גזמו כל שורש חום/שחור ורך.','שתלו מחדש באדמה יבשה ומאווררת עם ניקוז טוב.','הפסיקו להשקות עד שהשכבה העליונה מתייבשת לעומק 2–3 ס"מ.'],
+    prevention:'עציץ עם חורי ניקוז תמיד. משקים רק כשהאדמה יבשה בעומק אצבע.' },
+  { id:'underwatering', name:'חוסר השקיה', kind:'טיפול',
+    locations:['whole','leaves'], symptoms:['wilting','dry_edges','leaf_drop','slow_growth'],
+    desc:'אדמה יבשה לאורך זמן. העלים קמלים, הקצוות מתייבשים ומחומים.',
+    treatment:['השקו ביסודיות עד שמים ניגרים מחורי הניקוז.','לצמח מיובש קשה — השרו את העציץ בדלי מים ל-15 דקות.','הסירו עלים יבשים לגמרי.'],
+    prevention:'בדקו לחות אדמה באצבע לפני השקיה. השתמשו בתזכורות ההשקיה באפליקציה.' },
+  { id:'overwatering', name:'השקיית יתר', kind:'טיפול',
+    locations:['whole','leaves'], symptoms:['yellowing','wilting','slow_growth'],
+    desc:'עלים צהובים ורכים, אדמה תמיד רטובה. אם לא מטפלים — מתפתח לריקבון שורשים.',
+    treatment:['הפסיקו להשקות עד שהאדמה מתייבשת היטב.','ודאו ניקוז תקין — רוקנו מים עומדים מהצלחת.','שקלו להחליף לאדמה מאווררת יותר.'],
+    prevention:'כלל אצבע: עדיף להשקות פחות מאשר יותר. בדקו אדמה לפני כל השקיה.' },
+  { id:'iron_deficiency', name:'חוסר ברזל (כלורוזיס)', kind:'חוסר תזונתי',
+    locations:['leaves'], symptoms:['yellowing','slow_growth'],
+    desc:'העלים מצהיבים אבל העורקים נשארים ירוקים. נפוץ בקרקע בסיסית או אחרי השקיית יתר ממושכת.',
+    treatment:['דשנו עם כלאט ברזל לפי הוראות היצרן.','בדקו שהניקוז תקין — שורשים חנוקים לא קולטים ברזל.'],
+    prevention:'דישון מאוזן וסדיר. הימנעות מהשקיית יתר כרונית.' },
+  { id:'sunburn', name:'כוויית שמש', kind:'סביבה',
+    locations:['leaves'], symptoms:['brown_spots','dry_edges'],
+    desc:'כתמים בהירים או לבנים שהופכים חומים, אחרי חשיפה פתאומית לשמש חזקה.',
+    treatment:['העבירו לצל חלקי והרגילו לשמש בהדרגה.','הסירו עלים שרופים לגמרי — הם לא ישתקמו.'],
+    prevention:'הרגלה הדרגתית ("הקשייה") של צמחים שעוברים מצל לשמש.' },
+  { id:'fertilizer_burn', name:'דישון יתר', kind:'טיפול',
+    locations:['leaves','whole'], symptoms:['dry_edges','yellowing','wilting','slow_growth'],
+    desc:'קצוות עלים "שרופים" וחומים שהופיעו זמן קצר אחרי דישון.',
+    treatment:['שטפו את האדמה היטב במים נקיים (השקיית שטיפה יסודית).','הפסיקו דישון לחודש לפחות.'],
+    prevention:'דשנו תמיד לפי המינון המדויק — עדיף מעט מדי מאשר יותר מדי.' },
+  { id:'fungus_gnats', name:'יתושי פטריות', kind:'מזיק',
+    locations:['roots','whole'], symptoms:['bugs_visible','wilting','slow_growth'],
+    desc:'זבובונים קטנים מרחפים מעל האדמה. הזחלים באדמה פוגעים בשורשים צעירים.',
+    treatment:['תנו לשכבה העליונה של האדמה להתייבש בין השקיות.','הציבו מלכודות דבק צהובות ליד הצמח.','פזרו שכבת חול דקה על האדמה — מונע הטלה.'],
+    prevention:'לא להשקות יותר מדי. ניקוז טוב ושכבת אדמה עליונה יבשה.' }
+];
+let diagState = null;
+let pendingDiagPhoto = null;
+
+function diagSymptomText(id){ const s = DIAG_SYMPTOMS.find(x => x.id === id); return s ? s.text : id; }
+function diagLocationText(id){ const l = DIAG_LOCATIONS.find(x => x.id === id); return l ? l.text : id; }
+
+function openDiagnosis(plantId){
+  const p = state.plants.find(x => x.id === plantId);
+  if(!p) return;
+  diagState = { plantId: plantId, step: 1, photo: null, location: null, symptoms: [], results: [] };
+  pendingDiagPhoto = null;
+  delete $('dg_locations').dataset.built;
+  delete $('dg_symptoms').dataset.built;
+  $('dg_locations').innerHTML = '';
+  $('dg_symptoms').innerHTML = '';
+  $('diagPlantName').textContent = 'צמח: ' + p.name;
+  $('dg_preview').innerHTML = '';
+  renderDiagStep();
+  openModal('diagModal');
+}
+function renderDiagStep(){
+  const st = diagState;
+  if(!st) return;
+  document.querySelectorAll('#diagModal .diag-step').forEach(el => {
+    el.style.display = Number(el.dataset.step) === st.step ? '' : 'none';
+  });
+  $('dg_back').style.display = st.step > 1 ? '' : 'none';
+  $('dg_next').textContent = st.step === 3 ? 'אבחן' : (st.step === 4 ? 'סגור' : 'המשך');
+  if(st.step === 2 && !$('dg_locations').dataset.built){
+    $('dg_locations').dataset.built = '1';
+    $('dg_locations').innerHTML = DIAG_LOCATIONS.map(l =>
+      '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border,#e3e8e3);border-radius:12px;cursor:pointer">'
+      + '<input type="radio" name="dgloc" value="' + l.id + '"' + (st.location === l.id ? ' checked' : '') + '> ' + esc(l.text) + '</label>'
+    ).join('');
+    $('dg_locations').querySelectorAll('input[name="dgloc"]').forEach(r => r.addEventListener('change', () => { st.location = r.value; }));
+  }
+  if(st.step === 3 && !$('dg_symptoms').dataset.built){
+    $('dg_symptoms').dataset.built = '1';
+    $('dg_symptoms').innerHTML = DIAG_SYMPTOMS.map(s =>
+      '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid var(--border,#e3e8e3);border-radius:12px;cursor:pointer">'
+      + '<input type="checkbox" value="' + s.id + '"' + (st.symptoms.includes(s.id) ? ' checked' : '') + '> ' + esc(s.text) + '</label>'
+    ).join('');
+    $('dg_symptoms').querySelectorAll('input[type="checkbox"]').forEach(c => c.addEventListener('change', () => {
+      st.symptoms = Array.from($('dg_symptoms').querySelectorAll('input[type="checkbox"]:checked')).map(x => x.value);
+    }));
+  }
+  if(st.step === 4) renderDiagResults();
+}
+function diagNext(){
+  const st = diagState;
+  if(!st) return;
+  if(st.step === 4){ closeModal('diagModal'); return; }
+  if(st.step === 2 && !st.location){ toast('בחרו איפה הבעיה'); return; }
+  if(st.step === 3 && st.symptoms.length === 0){ toast('סמנו לפחות תסמין אחד'); return; }
+  if(st.step === 3){ st.results = runDiagnosis(st.location, st.symptoms); }
+  st.step++;
+  renderDiagStep();
+}
+function diagBack(){
+  const st = diagState;
+  if(!st || st.step <= 1) return;
+  st.step--;
+  renderDiagStep();
+}
+function runDiagnosis(location, symptoms){
+  const scored = DIAG_PROBLEMS.map(pr => {
+    const matched = pr.symptoms.filter(s => symptoms.includes(s));
+    const symScore = matched.length / pr.symptoms.length;
+    const locScore = pr.locations.includes(location) ? 0.3 : 0;
+    return { pr: pr, matched: matched, score: symScore * 0.7 + locScore };
+  }).filter(x => x.score > 0.12 && x.matched.length > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3);
+  return scored;
+}
+function renderDiagResults(){
+  const st = diagState;
+  const box = $('dg_results');
+  if(st.results.length === 0){
+    box.innerHTML = '<p class="note" style="font-size:15px">לא נמצאה התאמה ברורה לתסמינים שסומנו.</p>'
+      + '<p class="note" style="margin-top:8px">נסו לצלם תמונה קרובה של האזור הפגוע ולעקוב אחרי השינויים ביומן הגדילה. אם המצב מחמיר — כדאי להתייעץ במשתלה.</p>'
+      + '<div class="btn-row" style="margin-top:12px"><button class="btn secondary" id="dg_saveAny">שמור תיעוד ביומן</button></div>';
+    $('dg_saveAny').addEventListener('click', () => saveDiagnosis(null));
+    return;
+  }
+  box.innerHTML = st.results.map((r, i) => {
+    const pct = Math.min(95, Math.round(r.score * 100));
+    const level = pct >= 60 ? 'התאמה גבוהה' : (pct >= 35 ? 'התאמה בינונית' : 'התאמה נמוכה');
+    return '<div class="card" style="margin:0 0 12px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'
+      + '<h3 style="margin:0;font-size:17px">' + (i + 1) + '. ' + esc(r.pr.name) + '</h3>'
+      + '<span class="chip ' + (pct >= 60 ? 'due' : 'auto') + '">' + level + ' · ' + pct + '%</span></div>'
+      + '<p class="note" style="margin-top:4px">' + esc(r.pr.kind) + '</p>'
+      + '<p style="font-size:14px;margin:8px 0">' + esc(r.pr.desc) + '</p>'
+      + '<p style="font-size:14px;font-weight:800;margin:8px 0 4px">מה עושים:</p>'
+      + '<ol style="font-size:14px;margin:0;padding-right:18px">' + r.pr.treatment.map(t => '<li style="margin-bottom:4px">' + esc(t) + '</li>').join('') + '</ol>'
+      + '<p class="note" style="margin-top:8px"><b>מניעה:</b> ' + esc(r.pr.prevention) + '</p>'
+      + '<div class="btn-row" style="margin-top:10px"><button class="btn secondary" data-dsave="' + r.pr.id + '">שמור אבחון זה</button></div>'
+      + '</div>';
+  }).join('')
+  + '<p class="note">האבחון מבוסס על מאגר ידע של בעיות נפוצות ואינו מחליף ייעוץ מקצועי במקרה חמור.</p>';
+  box.querySelectorAll('[data-dsave]').forEach(b => b.addEventListener('click', () => {
+    const pr = DIAG_PROBLEMS.find(x => x.id === b.dataset.dsave);
+    saveDiagnosis(pr);
+  }));
+}
+async function handleDiagPhoto(file){
+  if(!file) return;
+  try{
+    pendingDiagPhoto = await compressImageFile(file);
+    if(diagState) diagState.photo = pendingDiagPhoto;
+    $('dg_preview').innerHTML = '<img src="' + pendingDiagPhoto + '" style="width:100%;border-radius:12px" alt="">';
+  }catch(e){ toast('לא הצלחתי לקרוא את התמונה'); }
+}
+function saveDiagnosis(problem){
+  const st = diagState;
+  if(!st) return;
+  const p = state.plants.find(x => x.id === st.plantId);
+  if(!p) return;
+  const label = problem ? problem.name : 'תיעוד בעיה (ללא אבחנה)';
+  if(!Array.isArray(p.history)) p.history = [];
+  p.history.unshift({ id: uid(), type: 'diagnosis', at: new Date().toISOString(), label: label,
+    location: st.location, symptoms: st.symptoms.slice() });
+  if(st.photo){
+    getJournal(p).push({ id: uid(), date: todayStr(), photo: st.photo, note: 'אבחון: ' + label });
+  }
+  save(); closeModal('diagModal'); openDetail(p.id);
+  toast('האבחון נשמר ונרשם ביומן');
 }
 
 /* ================= תמונות ================= */
@@ -1439,6 +1704,21 @@ $('compareReset').addEventListener('click', () => {
   $('compareHint').style.display = '';
   $('comparePick').querySelectorAll('[data-cmp]').forEach(x => x.style.borderColor = 'transparent');
 });
+
+/* אבחון בעיות */
+$('d_diagnose').addEventListener('click', () => {
+  const pid = $('detailModal').dataset.plantId;
+  closeModal('detailModal');
+  openDiagnosis(pid);
+});
+$('dg_photoBtn').addEventListener('click', () => $('diagPhotoInput').click());
+$('diagPhotoInput').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if(f) handleDiagPhoto(f);
+});
+$('dg_next').addEventListener('click', diagNext);
+$('dg_back').addEventListener('click', diagBack);
 
 /* השקיה */
 $('sysSave').addEventListener('click', () => {
