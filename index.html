@@ -459,13 +459,14 @@ a{color:var(--green-dark)}
       <p class="note" id="backupStatus" style="margin-top:10px"></p>
     </div>
 
-    <div class="card" id="syncCard" style="display:none">
+    <div class="card" id="syncCard">
       <h3>סנכרון ענן</h3>
-      <p class="note">סנכרון אוטומטי של הנתונים לענן — זמין בכל מכשיר, עם גיבוי אוטומטי.</p>
+      <p class="note">סנכרון אוטומטי של הצמחים, הטיפולים ותוכנית ההשקיה לענן — הנתונים זמינים בכל מכשיר עם אותו חשבון גוגל, ומגובים אוטומטית.</p>
       <div class="status-line"><span class="dot" id="syncDot"></span><span id="syncStatus">לא מחובר</span></div>
       <div class="btn-row">
         <button class="btn" id="syncSignIn">התחבר עם גוגל</button>
         <button class="btn secondary" id="syncSignOut" style="display:none">התנתק</button>
+        <button class="btn secondary" id="syncNow" style="display:none">סנכרן עכשיו</button>
       </div>
       <p class="note" id="syncInfo" style="margin-top:10px"></p>
     </div>
@@ -664,6 +665,9 @@ a{color:var(--green-dark)}
 
 <div id="toast"></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 <script>
 'use strict';
 /* ================= נתונים ================= */
@@ -695,21 +699,169 @@ const GALLERY = [
   { name:'עץ זית', cat:'גינה', img:'img/plants/olive.jpg', water:7, fert:45, loc:'מרפסת או גינה' }
 ];
 
-function defaultState(){ return { plants:[], zones:[], systemName:'', apiKey:'', notif:null }; }
+function defaultState(){ return { plants:[], zones:[], systemName:'', apiKey:'', notif:null, deletedPlants:[], settingsUpdatedAt:null }; }
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
     if(!raw) return defaultState();
     const s = JSON.parse(raw);
-    return Object.assign(defaultState(), s);
+    const d = Object.assign(defaultState(), s);
+    if(!Array.isArray(d.deletedPlants)) d.deletedPlants = [];
+    return d;
   }catch(e){ return defaultState(); }
 }
 let state = loadState();
-function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){ toast('האחסון מלא — נסו למחוק תמונות ישנות'); } }
+function save(){ stampChanges(); try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){ toast('האחסון מלא — נסו למחוק תמונות ישנות'); } schedulePush(); }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function plantImg(p){ return p.photo || CAT_IMG[p.category] || 'img/hero.jpg'; }
+
+/* ================= סנכרון ענן (Firebase) ================= */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCFUS5Kk9FgyVEzzCqXoEAY5kY8EW-hFxM",
+  authDomain: "plant-tracker-85766.firebaseapp.com",
+  projectId: "plant-tracker-85766",
+  storageBucket: "plant-tracker-85766.firebasestorage.app",
+  messagingSenderId: "740967243913",
+  appId: "1:740967243913:web:822f8b5590357c36c26658"
+};
+let fbAuth = null, fbDb = null, fbUser = null;
+let syncTimer = null, lastSyncAt = null, syncBusy = false;
+let plantHashCache = {};
+function fbReady(){ return !!(fbAuth && fbDb); }
+function fbInit(){
+  if(typeof firebase === 'undefined'){ setSyncStatus('off'); return; }
+  try{
+    if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    fbAuth = firebase.auth();
+    fbDb = firebase.firestore();
+    fbAuth.onAuthStateChanged(onAuthChanged);
+    updateSyncUI();
+  }catch(e){ setSyncStatus('off'); }
+}
+function stampChanges(){
+  const now = new Date().toISOString();
+  for(const p of state.plants){
+    const c = Object.assign({}, p); delete c.updatedAt;
+    const h = JSON.stringify(c);
+    if(plantHashCache[p.id] !== h){ p.updatedAt = now; plantHashCache[p.id] = h; }
+  }
+  const sObj = { zones: state.zones, systemName: state.systemName };
+  const sh = JSON.stringify(sObj);
+  if(stampChanges._s !== sh){ stampChanges._s = sh; state.settingsUpdatedAt = now; }
+}
+function cloudDoc(){
+  if(!fbUser || !fbDb) return null;
+  return fbDb.collection('users').doc(fbUser.uid).collection('data').doc('main');
+}
+function schedulePush(){
+  if(!fbUser || !fbDb) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(pushCloud, 2500);
+}
+async function pushCloud(){
+  if(!fbUser || !fbDb || syncBusy) return;
+  const doc = cloudDoc(); if(!doc) return;
+  syncBusy = true; setSyncStatus('syncing');
+  try{
+    await doc.set({
+      plants: state.plants,
+      zones: state.zones,
+      systemName: state.systemName,
+      settingsUpdatedAt: state.settingsUpdatedAt || null,
+      deletedPlants: state.deletedPlants || [],
+      updatedAt: new Date().toISOString()
+    });
+    lastSyncAt = new Date();
+    setSyncStatus('ok');
+  }catch(e){ setSyncStatus('error'); }
+  syncBusy = false;
+}
+function mergeCloud(cloud){
+  const tombs = {};
+  const allTombs = (state.deletedPlants || []).concat(cloud.deletedPlants || []);
+  for(const d of allTombs){ if(d && d.id && (!tombs[d.id] || d.deletedAt > tombs[d.id])) tombs[d.id] = d.deletedAt; }
+  const L = {}, C = {};
+  for(const p of state.plants) L[p.id] = p;
+  for(const p of (cloud.plants || [])) C[p.id] = p;
+  const merged = [];
+  const ids = new Set(Object.keys(L).concat(Object.keys(C)));
+  ids.forEach(id => {
+    const a = L[id], b = C[id];
+    let w = (a && b) ? (((b.updatedAt || '') > (a.updatedAt || '')) ? b : a) : (a || b);
+    if(tombs[id] && (w.updatedAt || '') <= tombs[id]) return;
+    merged.push(w);
+  });
+  state.plants = merged;
+  if((cloud.settingsUpdatedAt || '') > (state.settingsUpdatedAt || '')){
+    state.zones = cloud.zones || [];
+    state.systemName = cloud.systemName || '';
+    state.settingsUpdatedAt = cloud.settingsUpdatedAt;
+  }
+  const cutoff = new Date(Date.now() - 90 * 864e5).toISOString();
+  state.deletedPlants = Object.keys(tombs).map(id => ({ id: id, deletedAt: tombs[id] })).filter(d => d.deletedAt > cutoff);
+  plantHashCache = {};
+  for(const p of state.plants){ const c = Object.assign({}, p); delete c.updatedAt; plantHashCache[p.id] = JSON.stringify(c); }
+  stampChanges._s = JSON.stringify({ zones: state.zones, systemName: state.systemName });
+}
+async function pullCloud(){
+  if(!fbUser || !fbDb) return;
+  const doc = cloudDoc(); if(!doc) return;
+  setSyncStatus('syncing');
+  try{
+    const snap = await doc.get();
+    if(snap.exists){ mergeCloud(snap.data()); save(); renderAll(); }
+    else { await pushCloud(); return; }
+    lastSyncAt = new Date();
+    setSyncStatus('ok');
+  }catch(e){ setSyncStatus('error'); }
+}
+async function signInGoogle(){
+  if(!fbAuth){ toast('שירות הסנכרון לא נטען — בדקו חיבור רשת ורעננו'); return; }
+  setSyncStatus('syncing');
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try{ await fbAuth.signInWithPopup(provider); }
+  catch(e){
+    const code = e && e.code;
+    if(code === 'auth/popup-blocked' || code === 'auth/cancelled-popup-request'){
+      try{ await fbAuth.signInWithRedirect(provider); return; }
+      catch(e2){ setSyncStatus('error'); toast('ההתחברות נכשלה'); }
+    }
+    else if(code !== 'auth/popup-closed-by-user'){ setSyncStatus('error'); toast('ההתחברות נכשלה'); }
+    else setSyncStatus('off');
+  }
+}
+function onAuthChanged(user){
+  fbUser = user || null;
+  updateSyncUI();
+  if(fbUser){ pullCloud(); }
+  else { setSyncStatus('off'); }
+}
+function setSyncStatus(s){
+  const dot = $('syncDot'), txt = $('syncStatus');
+  if(!dot || !txt) return;
+  const map = {
+    off: ['#c9d6cd', 'לא מחובר'],
+    syncing: ['#e6a23c', 'מסנכרן…'],
+    ok: ['#43a047', 'מסונכרן'],
+    error: ['#e53935', 'שגיאת סנכרון — ינסה שוב אוטומטית']
+  };
+  const m = map[s] || map.off;
+  dot.style.background = m[0];
+  txt.textContent = m[1] + ((s === 'ok' && lastSyncAt) ? ' · ' + fmtDateTime(lastSyncAt) : '');
+}
+function updateSyncUI(){
+  const inBtn = $('syncSignIn'), outBtn = $('syncSignOut'), nowBtn = $('syncNow'), info = $('syncInfo');
+  if(!inBtn) return;
+  if(fbUser){
+    inBtn.style.display = 'none'; outBtn.style.display = ''; nowBtn.style.display = '';
+    info.textContent = 'מחובר כ־' + (fbUser.email || '') + '. שינויים מסתונכרנים אוטומטית.';
+  }else{
+    inBtn.style.display = ''; outBtn.style.display = 'none'; nowBtn.style.display = 'none';
+    info.textContent = 'התחברות עם חשבון גוגל מסנכרנת את הצמחים וההשקיה בין מכשירים ושומרת גיבוי אוטומטי בענן.';
+  }
+}
 
 /* ================= תאריכים ================= */
 function pad(n){ return String(n).padStart(2,'0'); }
@@ -1685,6 +1837,8 @@ $('d_delete').addEventListener('click', () => {
   const p = state.plants.find(x => x.id === id);
   if(!p) return;
   if(!confirm('למחוק את הצמח "' + p.name + '"? גם היסטוריית הטיפולים שלו תימחק.')) return;
+  if(!Array.isArray(state.deletedPlants)) state.deletedPlants = [];
+  state.deletedPlants.push({ id: id, deletedAt: new Date().toISOString() });
   state.plants = state.plants.filter(x => x.id !== id);
   save(); closeModal('detailModal'); renderAll(); toast('הצמח נמחק');
 });
@@ -1719,6 +1873,11 @@ $('diagPhotoInput').addEventListener('change', e => {
 });
 $('dg_next').addEventListener('click', diagNext);
 $('dg_back').addEventListener('click', diagBack);
+
+/* סנכרון ענן */
+$('syncSignIn').addEventListener('click', signInGoogle);
+$('syncSignOut').addEventListener('click', () => { if(fbAuth) fbAuth.signOut(); });
+$('syncNow').addEventListener('click', pullCloud);
 
 /* השקיה */
 $('sysSave').addEventListener('click', () => {
@@ -1765,6 +1924,7 @@ $('backupImport').addEventListener('change', e => {
 $('dateLine').textContent = new Intl.DateTimeFormat('he-IL', { weekday:'long', day:'numeric', month:'long', year:'numeric' }).format(new Date());
 buildDaysPicker([]);
 renderAll();
+fbInit();
 maybeNotifyOnOpen();
 
 if('serviceWorker' in navigator){
