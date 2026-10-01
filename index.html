@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1fae54">
+<meta name="theme-color" content="#0b8a48">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -14,22 +14,24 @@
 <link rel="apple-touch-icon" href="icon.svg">
 <style>
 :root{
-  --green:#1fbe5a;
-  --green-dark:#129347;
-  --green-soft:#e7f8ee;
+  --green:#16b364;
+  --green-dark:#0b8a48;
+  --green-deep:#065f33;
+  --green-soft:#e6f7ee;
+  --lime:#8be04e;
   --orange:#ff8a3d;
   --orange-soft:#fff1e6;
   --teal:#12b5a5;
   --teal-soft:#e5f7f5;
-  --bg:#f7f8f7;
+  --bg:#f2f7f3;
   --card:#ffffff;
-  --text:#15211a;
-  --muted:#6b7a70;
-  --border:#e3eee5;
+  --text:#122019;
+  --muted:#68796f;
+  --border:#e2eee6;
   --danger:#e5484d;
-  --radius:18px;
-  --shadow:0 2px 14px rgba(20,60,35,.07);
-  --nav-h:72px;
+  --radius:24px;
+  --shadow:0 10px 30px rgba(11,90,50,.10);
+  --shadow-sm:0 4px 16px rgba(11,90,50,.08);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
@@ -37,74 +39,123 @@ body{
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
   background:var(--bg);
   color:var(--text);
-  padding-bottom:calc(var(--nav-h) + 20px);
+  padding-bottom:118px;
 }
-button{font-family:inherit;cursor:pointer;border:none;background:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,select,textarea{font-family:inherit;font-size:16px}
 h1,h2,h3{margin:0}
+main{padding:0 16px;max-width:640px;margin:0 auto}
 
-/* ---------- header ---------- */
-.app-header{
-  padding:22px 18px 14px;
-  background:linear-gradient(180deg,#eefaf2 0%,var(--bg) 92%);
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M54 10C30 12 14 26 12 44c-1 7 2 10 9 9 18-2 31-19 33-43z' fill='%231fbe5a' fill-opacity='0.07'/%3E%3C/svg%3E"),linear-gradient(180deg,#eefaf2 0%,var(--bg) 92%);
-  background-repeat:no-repeat,no-repeat;
-  background-size:190px 190px,100% 100%;
-  background-position:top -45px left -30px,0 0;
-  position:relative;
-  overflow:hidden;
+/* ---------- hero ---------- */
+.hero{
+  position:relative;border-radius:0 0 28px 28px;overflow:hidden;min-height:196px;
+  display:flex;flex-direction:column;justify-content:flex-end;color:#fff;
+  margin:0 -16px;padding:18px 20px 20px;box-shadow:var(--shadow);
 }
-.app-header::after{
-  content:"";position:absolute;top:-34px;inset-inline-end:-24px;width:150px;height:150px;border-radius:50%;
-  background:radial-gradient(circle,rgba(31,190,90,.16) 0%,rgba(31,190,90,0) 70%);pointer-events:none;
+.hero img.bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.hero::after{content:"";position:absolute;inset:0;background:linear-gradient(200deg,rgba(6,50,28,0) 30%,rgba(6,50,28,.62) 88%)}
+.hero-top{position:relative;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:auto}
+.hero-brand{display:flex;align-items:center;gap:9px;font-weight:900;font-size:19px;text-shadow:0 2px 10px rgba(0,0,0,.45)}
+.leaf-logo{width:30px;height:30px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
+.bell-btn{
+  position:relative;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.22);
+  backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;color:#fff;
 }
-.app-header h1{font-size:28px;font-weight:900;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
-.app-header .date-line{color:var(--muted);font-size:14px;margin-top:2px}
-.leaf-logo{width:30px;height:30px;flex:0 0 auto}
+.bell-btn svg{width:22px;height:22px}
+.bell-badge{
+  position:absolute;top:-4px;inset-inline-end:-4px;min-width:20px;height:20px;border-radius:99px;
+  background:var(--danger);color:#fff;font-size:12px;font-weight:800;padding:0 5px;
+  display:none;align-items:center;justify-content:center;border:2px solid #fff;
+}
+.bell-badge.show{display:flex}
+.hero-bottom{position:relative;z-index:2}
+.hero-bottom h1{font-size:27px;font-weight:900;letter-spacing:-.3px;text-shadow:0 2px 12px rgba(0,0,0,.5)}
+.hero-date{font-size:14px;opacity:.92;margin-top:2px;text-shadow:0 1px 8px rgba(0,0,0,.5)}
+.hero-stats{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.stat-pill{
+  background:rgba(255,255,255,.22);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.35);
+  border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;
+}
+.stat-pill b{font-weight:900}
 
 /* ---------- search ---------- */
-.search-wrap{padding:10px 18px 4px;position:sticky;top:0;z-index:5;background:linear-gradient(var(--bg) 82%,transparent)}
+.search-wrap{padding:14px 0 2px;position:sticky;top:0;z-index:5;background:linear-gradient(var(--bg) 84%,transparent)}
 .search-box{
   display:flex;align-items:center;gap:8px;background:#fff;
-  border:1.5px solid var(--green);border-radius:999px;padding:11px 16px;
+  border:1.5px solid var(--border);border-radius:999px;padding:12px 16px;box-shadow:var(--shadow-sm);
 }
+.search-box:focus-within{border-color:var(--green)}
 .search-box input{border:none;outline:none;flex:1;background:transparent;color:var(--text)}
 .search-box .mag{color:var(--green-dark);display:flex}
 .search-box .mag svg{width:20px;height:20px}
 
 /* ---------- layout ---------- */
-main{padding:0 18px}
 .screen{display:none}
 .screen.active{display:block}
-.section-title{font-size:21px;font-weight:800;letter-spacing:-.2px;margin:22px 0 12px;display:flex;align-items:center;gap:9px;justify-content:flex-start}
-.section-title::before{content:"";width:5px;height:21px;border-radius:99px;background:linear-gradient(180deg,var(--green),var(--green-dark));flex:0 0 auto}
-.section-title .link-btn{margin-inline-start:auto}
-.section-title .link-btn{font-size:14px;color:var(--green);font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.section-title{font-size:20px;font-weight:800;letter-spacing:-.2px;margin:24px 0 12px;display:flex;align-items:center;gap:9px}
+.section-title::before{content:"";width:5px;height:21px;border-radius:99px;background:linear-gradient(180deg,var(--lime),var(--green-dark));flex:0 0 auto}
+.section-title .link-btn{margin-inline-start:auto;font-size:14px;color:var(--green-dark);font-weight:800}
+.section-title .sub{font-size:13px;color:var(--muted);font-weight:600}
 
 /* ---------- action cards ---------- */
-.action-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px}
+.action-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px}
 .action-card{
-  background:#fff;border:1px solid #edf3ed;border-radius:var(--radius);padding:16px 6px 13px;text-align:center;box-shadow:var(--shadow);
-  display:flex;flex-direction:column;align-items:center;gap:8px;font-weight:700;font-size:14px;color:var(--text);
-  transition:transform .12s ease;
+  border-radius:20px;padding:16px 6px 13px;text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:9px;font-weight:800;font-size:14px;color:var(--text);
+  transition:transform .12s ease;border:1px solid rgba(255,255,255,.7);
 }
-.action-card:active{transform:scale(.96)}
-.action-card .ic{display:flex;line-height:1}
-.action-card .ic svg{width:34px;height:34px}
+.action-card:active{transform:scale(.95)}
+.action-card.green{background:linear-gradient(160deg,#d9f7e4,#eefaf2)}
+.action-card.orange{background:linear-gradient(160deg,#ffe9d6,#fff6ec)}
+.action-card.teal{background:linear-gradient(160deg,#d8f4f0,#eefaf8)}
+.action-card .ic{
+  width:48px;height:48px;border-radius:16px;background:#fff;box-shadow:var(--shadow-sm);
+  display:flex;align-items:center;justify-content:center;line-height:1;
+}
+.action-card .ic svg{width:26px;height:26px}
 .action-card.green .ic{color:var(--green)}
 .action-card.orange .ic{color:var(--orange)}
 .action-card.teal .ic{color:var(--teal)}
 
+/* ---------- filter chips ---------- */
+.filter-row{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:none}
+.filter-row::-webkit-scrollbar{display:none}
+.f-chip{
+  flex:0 0 auto;border:1.5px solid var(--border);background:#fff;color:var(--muted);
+  border-radius:999px;padding:8px 14px;font-size:13.5px;font-weight:800;
+}
+.f-chip.active{background:var(--green);border-color:var(--green);color:#fff;box-shadow:0 6px 16px rgba(22,179,100,.35)}
+
+/* ---------- gallery ---------- */
+.gallery-row{display:flex;gap:12px;overflow-x:auto;padding:4px 2px 14px;scroll-snap-type:x mandatory;scrollbar-width:none}
+.gallery-row::-webkit-scrollbar{display:none}
+.g-card{
+  flex:0 0 158px;scroll-snap-align:start;background:#fff;border-radius:20px;overflow:hidden;box-shadow:var(--shadow-sm);text-align:right;
+}
+.g-card .g-photo{height:104px;position:relative}
+.g-card .g-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.g-card .g-cat{
+  position:absolute;top:8px;inset-inline-start:8px;background:rgba(255,255,255,.92);border-radius:999px;
+  font-size:11px;font-weight:800;color:var(--green-deep);padding:3px 8px;
+}
+.g-card .g-body{padding:9px 11px 11px}
+.g-card .g-name{font-weight:800;font-size:15px;display:block}
+.g-card .g-meta{font-size:12px;color:var(--muted);display:block;margin:2px 0 8px}
+.g-add{
+  width:100%;background:var(--green-soft);color:var(--green-dark);font-weight:800;font-size:13px;
+  border-radius:999px;padding:7px 0;
+}
+.g-add:active{background:var(--green);color:#fff}
+
 /* ---------- plant grid & cards ---------- */
 .plant-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .plant-card{
-  background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;text-align:right;padding:0;width:100%;
+  background:var(--card);border-radius:20px;box-shadow:var(--shadow-sm);overflow:hidden;text-align:right;padding:0;width:100%;
 }
-.plant-card .photo{height:150px;background:linear-gradient(145deg,#a9e5bf,#e7f8ee);display:flex;align-items:center;justify-content:center;font-size:42px;overflow:hidden}
-.plant-card .photo svg{width:56px;height:56px}
+.plant-card .photo{height:158px;display:block;overflow:hidden;position:relative}
 .plant-card .photo img{width:100%;height:100%;object-fit:cover;display:block}
-.plant-card .body{padding:10px 12px 12px}
-.plant-card .name{font-weight:800;font-size:19px;letter-spacing:-.2px;margin-bottom:2px;display:block}
+.plant-card .body{padding:10px 12px 12px;display:block}
+.plant-card .name{font-weight:800;font-size:17.5px;letter-spacing:-.2px;margin-bottom:2px;display:block}
 .plant-card .loc{color:var(--muted);font-size:12px;margin-bottom:6px;display:block}
 .chip{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:3px 9px;margin:2px 0 2px 4px}
 .chip.ok{background:var(--green-soft);color:var(--green-dark)}
@@ -114,45 +165,51 @@ main{padding:0 18px}
 
 /* ---------- task list ---------- */
 .task-card{
-  background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+  background:var(--card);border-radius:20px;box-shadow:var(--shadow-sm);
   padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;
 }
-.task-card .t-photo{width:52px;height:52px;border-radius:12px;background:linear-gradient(145deg,#a9e5bf,#e7f8ee);display:flex;align-items:center;justify-content:center;font-size:26px;overflow:hidden;flex:0 0 auto}
-.task-card .t-photo svg{width:30px;height:30px}
-.task-card .t-photo img{width:100%;height:100%;object-fit:cover}
+.task-card .t-photo{width:54px;height:54px;border-radius:14px;overflow:hidden;flex:0 0 auto;background:var(--green-soft)}
+.task-card .t-photo img{width:100%;height:100%;object-fit:cover;display:block}
 .task-card .t-main{flex:1;min-width:0}
 .task-card .t-name{font-weight:800;font-size:15px}
 .task-card .t-sub{font-size:13px;color:var(--muted)}
 .task-card .t-sub.over{color:var(--danger);font-weight:700}
 .done-btn{
   background:var(--green);color:#fff;font-weight:800;border-radius:999px;padding:9px 14px;font-size:14px;flex:0 0 auto;
+  box-shadow:0 6px 14px rgba(22,179,100,.35);
 }
 .done-btn:active{background:var(--green-dark)}
-.done-btn.fert{background:var(--orange)}
+.done-btn.fert{background:var(--orange);box-shadow:0 6px 14px rgba(255,138,61,.35)}
 
 /* ---------- generic cards & forms ---------- */
-.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:12px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow-sm);padding:18px;margin-bottom:12px}
 .card h3{font-size:17px;font-weight:800;margin-bottom:8px}
-.note{color:var(--muted);font-size:13px;line-height:1.5}
+.note{color:var(--muted);font-size:13px;line-height:1.55}
 .field{margin-bottom:12px}
 .field label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:5px}
 .field input[type=text],.field input[type=number],.field input[type=time],.field input[type=date],.field input[type=password],.field select,.field textarea{
-  width:100%;border:1.5px solid var(--border);border-radius:12px;padding:10px 12px;background:#fff;color:var(--text);outline:none;
+  width:100%;border:1.5px solid var(--border);border-radius:14px;padding:11px 12px;background:#fff;color:var(--text);outline:none;
 }
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green)}
+.field textarea.code{font-family:ui-monospace,Menlo,monospace;font-size:11px;direction:ltr;text-align:left;word-break:break-all}
 .btn{
   display:inline-block;background:var(--green);color:#fff;font-weight:800;border-radius:999px;padding:11px 20px;font-size:15px;
+  box-shadow:0 6px 16px rgba(22,179,100,.30);
 }
 .btn:active{background:var(--green-dark)}
-.btn.secondary{background:#eef4ef;color:var(--green-dark)}
-.btn.danger{background:#fdecec;color:var(--danger)}
+.btn.secondary{background:#eef4ef;color:var(--green-dark);box-shadow:none}
+.btn.danger{background:#fdecec;color:var(--danger);box-shadow:none}
 .btn.block{width:100%;text-align:center}
 .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .empty{
-  text-align:center;color:var(--muted);padding:26px 14px;background:var(--card);
-  border-radius:var(--radius);box-shadow:var(--shadow);font-size:14px;line-height:1.6;
+  text-align:center;color:var(--muted);padding:28px 16px;background:var(--card);
+  border-radius:var(--radius);box-shadow:var(--shadow-sm);font-size:14px;line-height:1.6;
 }
-.empty .big{font-size:38px;display:block;margin-bottom:8px}
+.empty .art{width:64px;height:64px;margin:0 auto 10px;border-radius:20px;background:var(--green-soft);display:flex;align-items:center;justify-content:center}
+.empty .art svg{width:34px;height:34px}
+.status-line{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;margin:10px 0}
+.dot{width:10px;height:10px;border-radius:50%;background:#c9d6cd;flex:0 0 auto}
+.dot.on{background:var(--green);box-shadow:0 0 0 4px var(--green-soft)}
 
 /* zones */
 .zone-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
@@ -171,28 +228,35 @@ main{padding:0 18px}
 .days-picker label:has(input:checked){background:var(--green);border-color:var(--green);color:#fff}
 .radio-row{display:flex;gap:8px}
 .radio-row label{
-  flex:1;text-align:center;border:1.5px solid var(--border);border-radius:12px;padding:10px;font-weight:700;cursor:pointer;color:var(--muted);background:#fff;
+  flex:1;text-align:center;border:1.5px solid var(--border);border-radius:14px;padding:10px;font-weight:700;cursor:pointer;color:var(--muted);background:#fff;
 }
 .radio-row input{display:none}
 .radio-row label:has(input:checked){border-color:var(--green);background:var(--green-soft);color:var(--green-dark)}
 
-/* ---------- bottom nav ---------- */
+/* ---------- bottom nav (floating) ---------- */
 .bottom-nav{
-  position:fixed;bottom:0;right:0;left:0;height:var(--nav-h);background:#fff;z-index:20;
-  box-shadow:0 -4px 18px rgba(25,70,40,.10);display:flex;align-items:flex-end;justify-content:space-around;
-  padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+  position:fixed;bottom:calc(12px + env(safe-area-inset-bottom));inset-inline:14px;max-width:612px;margin:0 auto;
+  background:rgba(255,255,255,.94);backdrop-filter:blur(14px);z-index:20;border-radius:28px;
+  box-shadow:0 14px 34px rgba(11,90,50,.20);display:flex;align-items:center;justify-content:space-around;
+  padding:8px 6px;border:1px solid rgba(226,238,230,.9);
 }
-.nav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700;color:#9aa79e;padding:4px 6px;flex:1}
+.nav-btn{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700;color:#93a89a;padding:5px 6px;flex:1;border-radius:16px}
 .nav-btn .ic{display:flex}
 .nav-btn .ic svg{width:24px;height:24px}
 .nav-btn.active{color:var(--green-dark)}
-.camera-btn{
-  width:64px;height:64px;border-radius:50%;background:var(--green);color:#fff;
-  display:flex;align-items:center;justify-content:center;box-shadow:0 10px 22px rgba(18,147,71,.45);
-  margin-top:-32px;border:4px solid #fff;flex:0 0 auto;
+.nav-badge{
+  position:absolute;top:0;inset-inline-end:calc(50% - 20px);min-width:18px;height:18px;border-radius:99px;
+  background:var(--danger);color:#fff;font-size:11px;font-weight:800;padding:0 4px;display:none;align-items:center;justify-content:center;
 }
-.camera-btn svg{width:30px;height:30px}
-.camera-btn:active{background:var(--green-dark)}
+.nav-badge.show{display:flex}
+.camera-btn{
+  width:58px;height:58px;border-radius:50%;color:#fff;flex:0 0 auto;margin-top:-30px;
+  background:linear-gradient(150deg,var(--lime),var(--green) 55%,var(--green-dark));
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 12px 26px rgba(11,138,72,.45);border:4px solid #fff;
+}
+.camera-btn svg{width:28px;height:28px}
+.camera-btn:active{transform:scale(.94)}
 
 /* ---------- modals ---------- */
 .modal-backdrop{
@@ -201,21 +265,21 @@ main{padding:0 18px}
 .modal-backdrop.open{display:flex}
 .modal{
   background:#fff;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;
-  border-radius:22px 22px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));
+  border-radius:26px 26px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));
 }
 .modal h2{font-size:20px;font-weight:800;margin-bottom:14px}
 .modal .close-x{float:left;font-size:20px;color:var(--muted);padding:2px 6px}
 .form-photo{
-  width:100%;height:170px;border-radius:var(--radius);background:linear-gradient(145deg,#a9e5bf,#e7f8ee);
-  display:flex;align-items:center;justify-content:center;font-size:44px;overflow:hidden;margin-bottom:8px;
+  width:100%;height:180px;border-radius:20px;background:var(--green-soft);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:8px;
 }
 .form-photo img{width:100%;height:100%;object-fit:cover}
 .form-photo svg{width:64px;height:64px}
-.detail-photo{width:100%;height:210px;border-radius:var(--radius);object-fit:cover;background:var(--green-soft);display:block;margin-bottom:12px}
+.detail-photo{width:100%;height:220px;border-radius:20px;object-fit:cover;background:var(--green-soft);display:block;margin-bottom:12px}
 .history-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px}
 .history-item:last-child{border-bottom:none}
 .match-card{
-  border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px;
+  border:1.5px solid var(--border);border-radius:20px;padding:12px 14px;margin-bottom:10px;
   display:flex;align-items:center;gap:10px;background:#fff;width:100%;text-align:right;
 }
 .match-card .m-main{flex:1}
@@ -231,7 +295,7 @@ main{padding:0 18px}
 
 /* ---------- toast ---------- */
 #toast{
-  position:fixed;bottom:calc(var(--nav-h) + 18px);right:50%;transform:translateX(50%) translateY(20px);
+  position:fixed;bottom:118px;right:50%;transform:translateX(50%) translateY(20px);
   background:#17301f;color:#fff;padding:11px 20px;border-radius:999px;font-size:14px;font-weight:700;
   opacity:0;pointer-events:none;transition:.25s;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:88vw;text-align:center;
 }
@@ -241,23 +305,39 @@ a{color:var(--green-dark)}
 </head>
 <body>
 
-<header class="app-header">
-  <h1><svg class="leaf-logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M54 10C30 12 14 26 12 44c-1 7 2 10 9 9 18-2 31-19 33-43z" fill="#1fbe5a"/><path d="M14 50C22 36 36 24 50 16" stroke="#0d6e35" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg> מעקב צמחים</h1>
-  <div class="date-line" id="dateLine"></div>
-</header>
-
 <main>
   <!-- ================= HOME ================= -->
   <section class="screen active" id="screen-home">
+    <div class="hero">
+      <img class="bg" src="img/hero.jpg" alt="">
+      <div class="hero-top">
+        <div class="hero-brand"><svg class="leaf-logo" viewBox="0 0 64 64" aria-hidden="true"><path d="M54 10C30 12 14 26 12 44c-1 7 2 10 9 9 18-2 31-19 33-43z" fill="#ffffff"/><path d="M14 50C22 36 36 24 50 16" stroke="#0b8a48" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg> מעקב צמחים</div>
+        <button class="bell-btn" id="bellBtn" aria-label="טיפולים להיום"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="bell-badge" id="bellBadge">0</span></button>
+      </div>
+      <div class="hero-bottom">
+        <h1>הגינה שלי</h1>
+        <div class="hero-date" id="dateLine"></div>
+        <div class="hero-stats">
+          <span class="stat-pill"><b id="statPlants">0</b> צמחים בגינה</span>
+          <span class="stat-pill"><b id="statToday">0</b> לטיפול היום</span>
+          <span class="stat-pill"><b id="statZones">0</b> אזורי השקיה</span>
+        </div>
+      </div>
+    </div>
+
     <div class="search-wrap">
       <div class="search-box"><span class="mag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></span><input type="text" id="homeSearch" placeholder="חיפוש צמח או מיקום…"></div>
     </div>
 
     <div class="action-row">
-      <button class="action-card green" id="actIdentify"><span class="ic"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M9.4 4.6 11 2.8c.2-.3.6-.5 1-.5s.8.2 1 .5l1.6 1.8H20a2.5 2.5 0 0 1 2.5 2.5v10A2.5 2.5 0 0 1 20 19.5H4A2.5 2.5 0 0 1 1.5 17V7.1A2.5 2.5 0 0 1 4 4.6h5.4z"/><circle cx="12" cy="12.4" r="4.1" fill="#fff"/><circle cx="12" cy="12.4" r="2.4" fill="currentColor"/></svg></span>זיהוי</button>
+      <button class="action-card green" id="actIdentify"><span class="ic"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M9.4 4.6 11 2.8c.2-.3.6-.5 1-.5s.8.2 1 .5l1.6 1.8H20a2.5 2.5 0 0 1 2.5 2.5v10A2.5 2.5 0 0 1 20 19.5H4A2.5 2.5 0 0 1 1.5 17V7.1A2.5 2.5 0 0 1 4 4.6h5.4z"/><circle cx="12" cy="12.4" r="4.1" fill="#fff"/><circle cx="12" cy="12.4" r="2.4" fill="currentColor"/></svg></span>זיהוי מצילום</button>
       <button class="action-card orange" id="actToday"><span class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"/><path d="M12 1.8c.7 0 1 .5 1 1.4v1.3h-2V3.2c0-.9.3-1.4 1-1.4zM12 19.5h2v1.3c0 .9-.3 1.4-1 1.4s-1-.5-1-1.4v-1.3zM22.2 12c0 .7-.5 1-1.4 1h-1.3v-2h1.3c.9 0 1.4.3 1.4 1zM4.5 11v2H3.2c-.9 0-1.4-.3-1.4-1s.5-1 1.4-1h1.3zM19.9 4.1c.5.5.3 1-.2 1.7l-.9 1-1.5-1.5.9-1c.6-.6 1.2-.7 1.7-.2zM7.2 16.8l-1 1c-.6.6-1.2.7-1.7.2-.5-.5-.3-1 .2-1.7l1-1 1.5 1.5zM19.9 19.9c-.5.5-1 .3-1.7-.2l-1-.9 1.5-1.5 1 .9c.6.6.7 1.2.2 1.7zM6.7 5.3l-1-1C5.1 3.6 4.6 3.5 4.1 4c-.5.5-.3 1 .2 1.7l.9 1 1.5-1.4z"/></svg></span>היום</button>
       <button class="action-card teal" id="actPlants"><span class="ic"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 11.4c-.3-3.2-2.4-5.4-6.2-5.9.3 3.8 2.4 5.7 6.2 5.9zM12.4 11.4c.3-3.4 2.6-5.8 6.8-6.4-.3 4.1-2.6 6.2-6.8 6.4zM5 13h14l-1.2 6.6A2.5 2.5 0 0 1 15.3 21H8.7a2.5 2.5 0 0 1-2.5-1.4L5 13z"/><rect x="4.2" y="11" width="15.6" height="2" rx="1" fill="currentColor"/></svg></span>הצמחים שלי</button>
     </div>
+
+    <h2 class="section-title">צמחים פופולריים <span class="sub">השראה לגינה שלך</span></h2>
+    <div class="filter-row" id="galleryChips"></div>
+    <div class="gallery-row" id="galleryRow"></div>
 
     <h2 class="section-title" id="todayTitle">לטיפול היום</h2>
     <div id="todayList"></div>
@@ -276,6 +356,7 @@ a{color:var(--green-dark)}
       <div class="search-box"><span class="mag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></span><input type="text" id="plantsSearch" placeholder="חיפוש צמח או מיקום…"></div>
     </div>
     <h2 class="section-title">הצמחים שלי <button class="link-btn" id="plantsAdd">+ הוסף צמח</button></h2>
+    <div class="filter-row" id="plantChips"></div>
     <div class="plant-grid" id="plantsGrid"></div>
     <div id="plantsEmpty"></div>
   </section>
@@ -290,7 +371,7 @@ a{color:var(--green-dark)}
         <input type="text" id="sysName" placeholder="למשל: בקר השקיה גינה">
       </div>
       <button class="btn" id="sysSave">שמור</button>
-      <p class="note" style="margin-top:10px">האפליקציה הזו רק מתעדת את תוכנית ההשקיה. ההפעלה והשליטה בפועל נשארות באפליקציית סמארטלייף — אין כאן חיבור חי למערכת.</p>
+      <p class="note" style="margin-top:10px">האפליקציה הזו מתעדת את תוכנית ההשקיה. ההפעלה והשליטה בפועל נשארות באפליקציית סמארטלייף — אין כאן חיבור חי למערכת.</p>
     </div>
 
     <h2 class="section-title">אזורי השקיה <button class="link-btn" id="zoneAddBtn">+ הוסף אזור</button></h2>
@@ -332,6 +413,26 @@ a{color:var(--green-dark)}
   <!-- ================= SETTINGS ================= -->
   <section class="screen" id="screen-settings">
     <h2 class="section-title">הגדרות</h2>
+
+    <div class="card">
+      <h3>התראות</h3>
+      <p class="note">קבל תזכורת כשהטיפולים של היום מחכים — גם כשהאפליקציה סגורה.</p>
+      <div class="status-line"><span class="dot" id="notifDot"></span><span id="notifStatus">ההתראות כבויות</span></div>
+      <div class="btn-row">
+        <button class="btn" id="notifEnable">הפעל התראות</button>
+        <button class="btn secondary" id="notifTest">שלח התראת בדיקה</button>
+      </div>
+      <div id="notifCodeWrap" style="display:none">
+        <div class="field" style="margin-top:14px">
+          <label for="notifCode">קוד רישום להתראות</label>
+          <textarea class="code" id="notifCode" rows="3" readonly></textarea>
+        </div>
+        <button class="btn secondary" id="notifCopy">העתק קוד</button>
+        <p class="note" style="margin-top:10px">שלח לי את הקוד הזה בצ׳אט, פעם אחת, ואחבר עבורך את תזכורת הבוקר האוטומטית (כל יום ב־08:00). עד אז ההתראות עובדות כשפותחים את האפליקציה.</p>
+      </div>
+      <p class="note" id="notifHint" style="margin-top:8px"></p>
+    </div>
+
     <div class="card">
       <h3>זיהוי צמחים מצילום</h3>
       <p class="note">הזיהוי עובד דרך שירות פלנטנט. מדביקים כאן מפתח אישי פעם אחת, והוא נשמר רק בטלפון הזה.</p>
@@ -346,6 +447,7 @@ a{color:var(--green-dark)}
       <p class="note" id="keyStatus" style="margin-top:10px"></p>
       <p class="note">אין לך מפתח? נרשמים בחינם ומקבלים אחד אישי כאן: <a href="https://my.plantnet.org/signup" target="_blank" rel="noopener">הרשמה לפלנטנט</a></p>
     </div>
+
     <div class="card">
       <h3>הנתונים שלך</h3>
       <p class="note">כל הצמחים, הטיפולים ותוכנית ההשקיה נשמרים בדפדפן של הטלפון הזה בלבד. מחיקת נתוני הדפדפן תמחק גם את נתוני האפליקציה, כך שכדאי לא לנקות אותם.</p>
@@ -355,7 +457,7 @@ a{color:var(--green-dark)}
 
 <!-- ================= BOTTOM NAV ================= -->
 <nav class="bottom-nav">
-  <button class="nav-btn active" data-nav="home"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5.5 9v11h13V9"/></svg></span>היום</button>
+  <button class="nav-btn active" data-nav="home"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5.5 9v11h13V9"/></svg></span>היום<span class="nav-badge" id="navBadge">0</span></button>
   <button class="nav-btn" data-nav="plants"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-7"/><path d="M12 14c0-3.9 2.9-6.5 7.5-6.5C19.5 11.4 16.6 14 12 14z"/><path d="M12 10.5C12 7 9.6 4.8 5 4.8c0 3.7 2.4 5.7 7 5.7z"/></svg></span>צמחים</button>
   <button class="camera-btn" id="cameraBtn" aria-label="זיהוי מצילום"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
   <button class="nav-btn" data-nav="irrigation"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5s6 6.6 6 10.5a6 6 0 0 1-12 0C6 10.1 12 3.5 12 3.5z"/></svg></span>השקיה</button>
@@ -367,7 +469,7 @@ a{color:var(--green-dark)}
   <div class="modal">
     <button class="close-x" data-close="plantModal">✕</button>
     <h2 id="plantFormTitle">צמח חדש</h2>
-    <div class="form-photo" id="f_photoPreview">🌱</div>
+    <div class="form-photo" id="f_photoPreview"></div>
     <div class="btn-row" style="margin:0 0 14px">
       <button class="btn secondary" id="f_photoBtn">בחר / צלם תמונה</button>
       <button class="btn secondary" id="f_identifyBtn">זהה מהתמונה</button>
@@ -375,6 +477,16 @@ a{color:var(--green-dark)}
     <div class="field">
       <label for="f_name">שם הצמח</label>
       <input type="text" id="f_name" placeholder="למשל: נענע">
+    </div>
+    <div class="field">
+      <label for="f_category">קטגוריה</label>
+      <select id="f_category">
+        <option value="בית">צמח בית</option>
+        <option value="מרפסת">מרפסת</option>
+        <option value="עשבי תיבול">עשבי תיבול</option>
+        <option value="פורחים">פורחים</option>
+        <option value="גינה">גינת ירק וגינה</option>
+      </select>
     </div>
     <div class="field">
       <label for="f_location">מיקום</label>
@@ -424,12 +536,12 @@ a{color:var(--green-dark)}
   <div class="modal">
     <button class="close-x" data-close="detailModal">✕</button>
     <h2 id="d_name">צמח</h2>
-    <img class="detail-photo" id="d_photo" alt="" style="display:none">
+    <img class="detail-photo" id="d_photo" alt="">
     <div id="d_meta" class="note" style="color:var(--text);font-size:14px"></div>
     <div id="d_chips" style="margin-top:10px"></div>
     <div class="btn-row">
       <button class="btn" id="d_markWater">השקיתי היום</button>
-      <button class="btn" id="d_markFert" style="background:var(--orange)">דישנתי היום</button>
+      <button class="btn" id="d_markFert" style="background:var(--orange);box-shadow:0 6px 16px rgba(255,138,61,.30)">דישנתי היום</button>
     </div>
     <div class="btn-row">
       <button class="btn secondary" id="d_edit">עריכה</button>
@@ -459,9 +571,33 @@ a{color:var(--green-dark)}
 /* ================= נתונים ================= */
 const LS_KEY = 'plant-tracker-standalone-v1';
 const LEAF_PH = '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M54 10C30 12 14 26 12 44c-1 7 2 10 9 9 18-2 31-19 33-43z" fill="#ffffff" opacity=".92"/><path d="M14 50C22 36 36 24 50 16" stroke="#57b877" stroke-width="3.5" fill="none" stroke-linecap="round"/></svg>';
+const EMPTY_ART = '<div class="art"><svg viewBox="0 0 24 24" fill="none" stroke="#0b8a48" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-7"/><path d="M12 14c0-3.9 2.9-6.5 7.5-6.5C19.5 11.4 16.6 14 12 14z"/><path d="M12 10.5C12 7 9.6 4.8 5 4.8c0 3.7 2.4 5.7 7 5.7z"/></svg></div>';
 const WEEKDAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 
-function defaultState(){ return { plants:[], zones:[], systemName:'', apiKey:'' }; }
+/* תמונת ברירת מחדל לפי קטגוריה — כדי שכל כרטיס ייראה חי גם בלי צילום */
+const CAT_IMG = {
+  'בית': 'img/indoor.jpg',
+  'מרפסת': 'img/hero.jpg',
+  'עשבי תיבול': 'img/herbs.jpg',
+  'פורחים': 'img/flowers.jpg',
+  'גינה': 'img/hero.jpg'
+};
+const PLANT_CATS = ['הכול','בית','מרפסת','עשבי תיבול','פורחים','גינה'];
+const GALLERY_CATS = ['הכול','בית','עשבי תיבול','פורחים','גינה'];
+const GALLERY = [
+  { name:'מונסטרה', cat:'בית', img:'img/indoor.jpg', water:7, fert:30, loc:'בית, ליד חלון מואר' },
+  { name:'פוטוס', cat:'בית', img:'img/indoor.jpg', water:6, fert:30, loc:'בית, מדף או תלוי' },
+  { name:'בזיליקום', cat:'עשבי תיבול', img:'img/herbs.jpg', water:2, fert:14, loc:'אדן חלון שטוף שמש' },
+  { name:'נענע', cat:'עשבי תיבול', img:'img/herbs.jpg', water:2, fert:21, loc:'מרפסת, חצי צל' },
+  { name:'רוזמרין', cat:'עשבי תיבול', img:'img/herbs.jpg', water:5, fert:30, loc:'מרפסת שטופת שמש' },
+  { name:'לבנדר', cat:'פורחים', img:'img/flowers.jpg', water:4, fert:30, loc:'גינה או מרפסת' },
+  { name:'הידראנגאה', cat:'פורחים', img:'img/flowers.jpg', water:3, fert:21, loc:'גינה, חצי צל' },
+  { name:'דליה', cat:'פורחים', img:'img/flowers.jpg', water:3, fert:14, loc:'גינה שטופת שמש' },
+  { name:'עגבנייה', cat:'גינה', img:'img/hero.jpg', water:2, fert:14, loc:'גינת ירק שטופת שמש' },
+  { name:'עץ זית', cat:'גינה', img:'img/hero.jpg', water:7, fert:45, loc:'מרפסת או גינה' }
+];
+
+function defaultState(){ return { plants:[], zones:[], systemName:'', apiKey:'', notif:null }; }
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
@@ -475,6 +611,7 @@ function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catc
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function plantImg(p){ return p.photo || CAT_IMG[p.category] || 'img/hero.jpg'; }
 
 /* ================= תאריכים ================= */
 function pad(n){ return String(n).padStart(2,'0'); }
@@ -487,19 +624,17 @@ function fmtDate(s){ const d = parseDate(s); if(!d) return ''; return new Intl.D
 function fmtDateTime(dt){ return new Intl.DateTimeFormat('he-IL',{weekday:'long',day:'numeric',month:'numeric'}).format(dt) + ' בשעה ' + pad(dt.getHours()) + ':' + pad(dt.getMinutes()); }
 
 /* ================= לוגיקת טיפול ================= */
-// מחזיר {cls, text, dueIn} — dueIn שלילי = איחור בימים
 function careStatus(last, interval){
   if(!interval || interval <= 0) return null;
   if(!last) return { cls:'due', text:'טרם סומן ביצוע', dueIn:0, never:true };
   const dueDate = addDays(last, interval);
-  const d = diffDays(todayStr(), dueDate); // ימים עד המועד
+  const d = diffDays(todayStr(), dueDate);
   if(d < 0) return { cls:'over', text:'באיחור של ' + (-d) + (d === -1 ? ' יום' : ' ימים'), dueIn:d };
   if(d === 0) return { cls:'due', text:'היום', dueIn:0 };
   return { cls:'ok', text:'בעוד ' + d + (d === 1 ? ' יום' : ' ימים'), dueIn:d };
 }
 function getZone(id){ return state.zones.find(z => z.id === id) || null; }
 
-// המועד הבא של אזור: היום או בשבעת הימים הקרובים
 function nextZoneRun(zone, from){
   if(!zone || !zone.active || !zone.days || zone.days.length === 0) return null;
   const base = from ? new Date(from) : new Date();
@@ -532,6 +667,21 @@ function plantChips(p){
   return chips;
 }
 
+/* משימות הטיפול של היום (השקיה ידנית + דישון שהגיע זמנן) */
+function dueTasks(){
+  const tasks = [];
+  state.plants.forEach(p => {
+    if(p.mode !== 'auto'){
+      const w = careStatus(p.lastWater, p.waterInterval);
+      if(w && (w.never || w.dueIn <= 0)) tasks.push({ p, type:'water', st:w });
+    }
+    const f = careStatus(p.lastFert, p.fertInterval);
+    if(f && (f.never || f.dueIn <= 0)) tasks.push({ p, type:'fert', st:f });
+  });
+  tasks.sort((a,b) => a.st.dueIn - b.st.dueIn);
+  return tasks;
+}
+
 /* ================= ניווט ================= */
 function showScreen(name){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -555,11 +705,10 @@ document.querySelectorAll('.modal-backdrop').forEach(m => m.addEventListener('cl
 /* ================= רינדור: כרטיס צמח ================= */
 function plantCardHTML(p){
   const chips = plantChips(p).map(c => '<span class="chip ' + c.cls + '">' + esc(c.text) + '</span>').join('');
-  const photo = p.photo ? '<img src="' + p.photo + '" alt="">' : LEAF_PH;
   return '<button class="plant-card" data-plant="' + p.id + '">'
-    + '<span class="photo">' + photo + '</span>'
+    + '<span class="photo"><img src="' + esc(plantImg(p)) + '" alt="" loading="lazy"></span>'
     + '<span class="body"><span class="name">' + esc(p.name) + '</span>'
-    + (p.location ? '<span class="loc">📍 ' + esc(p.location) + '</span>' : '')
+    + (p.location ? '<span class="loc">' + esc(p.location) + '</span>' : '')
     + '<span>' + chips + '</span></span></button>';
 }
 function bindPlantCards(container){
@@ -571,29 +720,58 @@ function matchSearch(p, q){
   return (p.name && p.name.includes(q)) || (p.location && p.location.includes(q));
 }
 
+/* ================= גלריה ================= */
+let galleryFilter = 'הכול';
+function renderGallery(){
+  $('galleryChips').innerHTML = GALLERY_CATS.map(c =>
+    '<button class="f-chip' + (c === galleryFilter ? ' active' : '') + '" data-gcat="' + esc(c) + '">' + esc(c) + '</button>'
+  ).join('');
+  $('galleryChips').querySelectorAll('[data-gcat]').forEach(b => b.addEventListener('click', () => {
+    galleryFilter = b.dataset.gcat; renderGallery();
+  }));
+  const items = GALLERY.map((g, i) => ({ g, i })).filter(x => galleryFilter === 'הכול' || x.g.cat === galleryFilter);
+  $('galleryRow').innerHTML = items.map(x =>
+    '<div class="g-card"><div class="g-photo"><img src="' + x.g.img + '" alt="" loading="lazy"><span class="g-cat">' + esc(x.g.cat) + '</span></div>'
+    + '<div class="g-body"><span class="g-name">' + esc(x.g.name) + '</span>'
+    + '<span class="g-meta">השקיה כל ' + x.g.water + ' ימים · דישון כל ' + x.g.fert + '</span>'
+    + '<button class="g-add" data-gadd="' + x.i + '">+ הוסף לגינה שלי</button></div></div>'
+  ).join('');
+  $('galleryRow').querySelectorAll('[data-gadd]').forEach(b => b.addEventListener('click', () => galleryAdd(Number(b.dataset.gadd))));
+}
+async function galleryAdd(i){
+  const g = GALLERY[i];
+  if(!g) return;
+  let photo = g.img;
+  try{
+    const res = await fetch(g.img);
+    const blob = await res.blob();
+    photo = await compressImageFile(new File([blob], 'plant.jpg', { type: blob.type || 'image/jpeg' }));
+  }catch(e){ /* נשארים עם נתיב התמונה */ }
+  openPlantForm(null, { name:g.name, category:g.cat, photo:photo, waterInterval:g.water, fertInterval:g.fert, location:g.loc });
+}
+
 /* ================= רינדור: בית ================= */
 function renderHome(){
   const q = $('homeSearch').value;
-  // לטיפול היום
-  const tasks = [];
-  state.plants.forEach(p => {
-    if(p.mode !== 'auto'){
-      const w = careStatus(p.lastWater, p.waterInterval);
-      if(w && (w.never || w.dueIn <= 0)) tasks.push({ p, type:'water', st:w });
-    }
-    const f = careStatus(p.lastFert, p.fertInterval);
-    if(f && (f.never || f.dueIn <= 0)) tasks.push({ p, type:'fert', st:f });
-  });
-  tasks.sort((a,b) => a.st.dueIn - b.st.dueIn);
+  const tasks = dueTasks();
+
+  /* סטטיסטיקה ותגי התראות */
+  $('statPlants').textContent = state.plants.length;
+  $('statToday').textContent = tasks.length;
+  $('statZones').textContent = state.zones.filter(z => z.active).length;
+  const bb = $('bellBadge'); bb.textContent = tasks.length; bb.classList.toggle('show', tasks.length > 0);
+  const nb = $('navBadge'); nb.textContent = tasks.length; nb.classList.toggle('show', tasks.length > 0);
+
+  /* לטיפול היום */
   const tl = $('todayList');
   if(tasks.length === 0){
-    tl.innerHTML = '<div class="empty"><span class="big">🎉</span>אין מה לטפל היום. כל הצמחים מסודרים.</div>';
+    tl.innerHTML = '<div class="empty">' + EMPTY_ART + 'אין מה לטפל היום. כל הצמחים מסודרים.</div>';
   } else {
     tl.innerHTML = tasks.map(t => {
       const isW = t.type === 'water';
       const sub = isW ? 'השקיה' : 'דישון';
       const overText = t.st.never ? 'טרם סומן ביצוע' : (t.st.dueIn < 0 ? ('באיחור של ' + (-t.st.dueIn) + ' ימים') : 'מועד הטיפול היום');
-      return '<div class="task-card"><div class="t-photo">' + (t.p.photo ? '<img src="' + t.p.photo + '" alt="">' : LEAF_PH) + '</div>'
+      return '<div class="task-card"><div class="t-photo"><img src="' + esc(plantImg(t.p)) + '" alt=""></div>'
         + '<div class="t-main"><div class="t-name">' + esc(t.p.name) + '</div>'
         + '<div class="t-sub ' + (t.st.dueIn < 0 || t.st.never ? 'over' : '') + '">' + sub + ' · ' + esc(overText) + '</div></div>'
         + '<button class="done-btn ' + (isW ? '' : 'fert') + '" data-done="' + t.p.id + ':' + t.type + '">בוצע היום</button></div>';
@@ -603,46 +781,52 @@ function renderHome(){
     }));
   }
 
-  // השקיה אוטומטית קרובה
+  /* השקיה אוטומטית קרובה */
   const autos = [];
   state.plants.filter(p => p.mode === 'auto').forEach(p => {
     const z = getZone(p.zoneId);
-    if(z){
-      const nxt = nextZoneRun(z);
-      autos.push({ p, z, nxt });
-    }
+    if(z) autos.push({ p, z, nxt: nextZoneRun(z) });
   });
   autos.sort((a,b) => (a.nxt ? a.nxt.getTime() : Infinity) - (b.nxt ? b.nxt.getTime() : Infinity));
   const al = $('autoList');
   if(autos.length === 0){
-    al.innerHTML = '<div class="empty"><span class="big">💧</span>אין צמחים בהשקיה אוטומטית עדיין.<br>שויך צמח לאזור במסך ההשקיה ותראה כאן את ההשקיה הבאה שלו.</div>';
+    al.innerHTML = '<div class="empty">' + EMPTY_ART + 'אין צמחים בהשקיה אוטומטית עדיין.<br>שייך צמח לאזור במסך ההשקיה ותראה כאן את ההשקיה הבאה שלו.</div>';
   } else {
     al.innerHTML = autos.map(a => {
       const when = a.nxt ? fmtDateTime(a.nxt) + ' · ' + a.z.durationMin + ' דק׳' : 'האזור אינו פעיל';
-      return '<div class="task-card"><div class="t-photo">' + (a.p.photo ? '<img src="' + a.p.photo + '" alt="">' : LEAF_PH) + '</div>'
+      return '<div class="task-card"><div class="t-photo"><img src="' + esc(plantImg(a.p)) + '" alt=""></div>'
         + '<div class="t-main"><div class="t-name">' + esc(a.p.name) + '</div>'
         + '<div class="t-sub">אזור ' + esc(a.z.name) + ' · ' + esc(when) + '</div></div></div>';
     }).join('');
   }
 
-  // גריד צמחים בבית
+  /* גריד צמחים בבית */
   const list = state.plants.filter(p => matchSearch(p, q));
   $('homeGrid').innerHTML = list.map(plantCardHTML).join('');
   bindPlantCards($('homeGrid'));
   $('homeEmpty').innerHTML = state.plants.length === 0
-    ? '<div class="empty"><span class="big">🌱</span>עוד לא הוספת צמחים.<br>אפשר להתחיל בכפתור המצלמה למטה, או ב״הוסף צמח״.</div>'
+    ? '<div class="empty">' + EMPTY_ART + 'עוד לא הוספת צמחים.<br>אפשר להתחיל מהגלריה למעלה, מכפתור המצלמה, או מ״הוסף צמח״.</div>'
     : (list.length === 0 ? '<div class="empty">לא נמצאו צמחים שמתאימים לחיפוש.</div>' : '');
+
+  renderGallery();
 }
 
 /* ================= רינדור: צמחים ================= */
+let plantFilter = 'הכול';
 function renderPlants(){
+  $('plantChips').innerHTML = PLANT_CATS.map(c =>
+    '<button class="f-chip' + (c === plantFilter ? ' active' : '') + '" data-pcat="' + esc(c) + '">' + esc(c) + '</button>'
+  ).join('');
+  $('plantChips').querySelectorAll('[data-pcat]').forEach(b => b.addEventListener('click', () => {
+    plantFilter = b.dataset.pcat; renderPlants();
+  }));
   const q = $('plantsSearch').value;
-  const list = state.plants.filter(p => matchSearch(p, q));
+  const list = state.plants.filter(p => matchSearch(p, q) && (plantFilter === 'הכול' || (p.category || '') === plantFilter));
   $('plantsGrid').innerHTML = list.map(plantCardHTML).join('');
   bindPlantCards($('plantsGrid'));
   $('plantsEmpty').innerHTML = state.plants.length === 0
-    ? '<div class="empty"><span class="big">🌱</span>עוד אין צמחים ברשימה.<br>לחץ על ״הוסף צמח״ כדי להתחיל.</div>'
-    : (list.length === 0 ? '<div class="empty">לא נמצאו צמחים שמתאימים לחיפוש.</div>' : '');
+    ? '<div class="empty">' + EMPTY_ART + 'עוד אין צמחים ברשימה.<br>לחץ על ״הוסף צמח״ כדי להתחיל.</div>'
+    : (list.length === 0 ? '<div class="empty">לא נמצאו צמחים בקטגוריה או בחיפוש הזה.</div>' : '');
 }
 
 /* ================= רינדור: השקיה ================= */
@@ -651,7 +835,7 @@ function renderIrrigation(){
   $('sysName').value = state.systemName || '';
   const zl = $('zonesList');
   if(state.zones.length === 0){
-    zl.innerHTML = '<div class="empty"><span class="big">💧</span>עוד לא הוגדרו אזורי השקיה.<br>הוסף אזור כדי לשייך אליו צמחים להשקיה אוטומטית.</div>';
+    zl.innerHTML = '<div class="empty">' + EMPTY_ART + 'עוד לא הוגדרו אזורי השקיה.<br>הוסף אזור כדי לשייך אליו צמחים להשקיה אוטומטית.</div>';
     return;
   }
   zl.innerHTML = state.zones.map(z => {
@@ -721,7 +905,8 @@ function deleteZone(id){
 /* ================= רינדור: הגדרות ================= */
 function renderSettings(){
   $('apiKeyInput').value = state.apiKey || '';
-  $('keyStatus').textContent = state.apiKey ? '✓ יש מפתח שמור — הזיהוי מצילום פעיל.' : 'לא הוגדר מפתח — הזיהוי מצילום מושבת, הוספה ידנית עובדת כרגיל.';
+  $('keyStatus').textContent = state.apiKey ? 'יש מפתח שמור — הזיהוי מצילום פעיל.' : 'לא הוגדר מפתח — הזיהוי מצילום מושבת, הוספה ידנית עובדת כרגיל.';
+  renderNotif();
 }
 
 /* ================= רינדור כללי ================= */
@@ -741,7 +926,7 @@ function markCare(plantId, type){
 }
 
 let editingPlantId = null;
-let pendingPhoto = null; // data URL של תמונת הצמח בטופס
+let pendingPhoto = null;
 let lastIdentifyPhoto = null;
 
 function refreshZoneSelect(selectedId){
@@ -755,24 +940,29 @@ function updateModeUI(){
   $('f_zoneWrap').style.display = mode === 'auto' ? 'block' : 'none';
   $('f_waterWrap').style.display = mode === 'auto' ? 'none' : 'block';
 }
+function updateFormPhotoPreview(){
+  const src = pendingPhoto || CAT_IMG[$('f_category').value] || 'img/hero.jpg';
+  $('f_photoPreview').innerHTML = '<img src="' + esc(src) + '" alt="">';
+}
 
 function openPlantForm(plantId, preset){
   editingPlantId = plantId || null;
   const p = plantId ? state.plants.find(x => x.id === plantId) : null;
   $('plantFormTitle').textContent = p ? 'עריכת צמח' : 'צמח חדש';
   $('f_name').value = p ? p.name : (preset && preset.name ? preset.name : '');
-  $('f_location').value = p ? (p.location || '') : '';
+  $('f_category').value = p ? (p.category || 'בית') : (preset && preset.category ? preset.category : 'בית');
+  $('f_location').value = p ? (p.location || '') : (preset && preset.location ? preset.location : '');
   $('f_notes').value = p ? (p.notes || '') : '';
   pendingPhoto = p ? (p.photo || null) : (preset && preset.photo ? preset.photo : null);
-  $('f_photoPreview').innerHTML = pendingPhoto ? '<img src="' + pendingPhoto + '" alt="">' : LEAF_PH;
   const mode = p ? p.mode : 'manual';
   document.querySelectorAll('input[name="fmode"]').forEach(r => { r.checked = r.value === mode; });
   refreshZoneSelect(p ? p.zoneId : null);
-  $('f_water').value = p && p.waterInterval ? p.waterInterval : '';
-  $('f_fert').value = p && p.fertInterval ? p.fertInterval : '';
+  $('f_water').value = p && p.waterInterval ? p.waterInterval : (preset && preset.waterInterval ? preset.waterInterval : '');
+  $('f_fert').value = p && p.fertInterval ? p.fertInterval : (preset && preset.fertInterval ? preset.fertInterval : '');
   $('f_lastWater').value = p && p.lastWater ? p.lastWater : '';
   $('f_lastFert').value = p && p.lastFert ? p.lastFert : '';
   updateModeUI();
+  updateFormPhotoPreview();
   openModal('plantModal');
 }
 
@@ -782,6 +972,7 @@ function savePlant(){
   const mode = document.querySelector('input[name="fmode"]:checked').value;
   const data = {
     name: name,
+    category: $('f_category').value,
     location: $('f_location').value.trim(),
     notes: $('f_notes').value.trim(),
     photo: pendingPhoto,
@@ -806,17 +997,17 @@ function openDetail(plantId){
   if(!p) return;
   $('detailModal').dataset.plantId = plantId;
   $('d_name').textContent = p.name;
-  const img = $('d_photo');
-  if(p.photo){ img.src = p.photo; img.style.display = 'block'; } else { img.style.display = 'none'; img.removeAttribute('src'); }
+  $('d_photo').src = plantImg(p);
   const z = p.mode === 'auto' ? getZone(p.zoneId) : null;
   const lines = [];
-  if(p.location) lines.push('📍 ' + esc(p.location));
-  if(p.mode === 'auto') lines.push('💧 השקיה אוטומטית' + (z ? ' · אזור ' + esc(z.name) : ''));
-  else if(p.waterInterval) lines.push('💧 השקיה ידנית כל ' + p.waterInterval + ' ימים');
-  if(p.fertInterval) lines.push('🌾 דישון כל ' + p.fertInterval + ' ימים');
+  if(p.category) lines.push('קטגוריה: ' + esc(p.category));
+  if(p.location) lines.push('מיקום: ' + esc(p.location));
+  if(p.mode === 'auto') lines.push('השקיה אוטומטית' + (z ? ' · אזור ' + esc(z.name) : ''));
+  else if(p.waterInterval) lines.push('השקיה ידנית כל ' + p.waterInterval + ' ימים');
+  if(p.fertInterval) lines.push('דישון כל ' + p.fertInterval + ' ימים');
   if(p.lastWater) lines.push('השקיה אחרונה: ' + fmtDate(p.lastWater));
   if(p.lastFert) lines.push('דישון אחרון: ' + fmtDate(p.lastFert));
-  if(p.notes) lines.push('📝 ' + esc(p.notes));
+  if(p.notes) lines.push('הערות: ' + esc(p.notes));
   $('d_meta').innerHTML = lines.join('<br>');
   $('d_chips').innerHTML = plantChips(p).map(c => '<span class="chip ' + c.cls + '">' + esc(c.text) + '</span>').join('');
   $('d_markWater').style.display = p.mode === 'auto' ? 'none' : '';
@@ -825,13 +1016,12 @@ function openDetail(plantId){
     ? '<p class="note">עדיין לא נרשמו טיפולים לצמח הזה.</p>'
     : hist.slice(0, 30).map(h => {
         const d = new Date(h.at);
-        return '<div class="history-item"><span>' + (h.type === 'water' ? '💧 השקיה' : '🌾 דישון') + '</span><span class="note">' + new Intl.DateTimeFormat('he-IL',{day:'numeric',month:'numeric',year:'numeric'}).format(d) + '</span></div>';
+        return '<div class="history-item"><span>' + (h.type === 'water' ? '<span class="chip auto">השקיה</span>' : '<span class="chip due">דישון</span>') + '</span><span class="note">' + new Intl.DateTimeFormat('he-IL',{day:'numeric',month:'numeric',year:'numeric'}).format(d) + '</span></div>';
       }).join('');
   openModal('detailModal');
 }
 
 /* ================= תמונות ================= */
-// מכווץ תמונה עד ~800px ומחזיר JPEG data URL
 function compressImageFile(file){
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -924,6 +1114,91 @@ async function identifyFromDataURL(dataURL){
   }
 }
 
+/* ================= התראות ================= */
+const VAPID_PUBLIC_KEY = 'BF7i7WQHWwjhvzcuDrx5XjIvKt6QP9s0Kq9Mqc4S8oxoASTR5tGGP_w8i_1F0Rn75ZcrzPFCKUHP5B_Tn53ron4';
+function urlB64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  const arr = new Uint8Array(raw.length);
+  for(let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+function renderNotif(){
+  const n = state.notif || {};
+  const enabled = !!n.enabled;
+  $('notifDot').classList.toggle('on', enabled);
+  $('notifStatus').textContent = enabled ? 'ההתראות פעילות' : 'ההתראות כבויות';
+  $('notifEnable').textContent = enabled ? 'עדכן קוד רישום' : 'הפעל התראות';
+  if(n.code){
+    $('notifCodeWrap').style.display = 'block';
+    $('notifCode').value = n.code;
+  }
+  if(enabled && !n.code){
+    $('notifHint').textContent = 'ההרשאה ניתנה. לחץ שוב על הפעלה כדי לקבל קוד רישום.';
+  }
+}
+async function enableNotifications(){
+  const hint = $('notifHint');
+  if(!('Notification' in window) || !('PushManager' in window) || !('serviceWorker' in navigator)){
+    hint.textContent = 'המכשיר או הדפדפן הזה לא תומך בהתראות. באייפון צריך לפתוח את האפליקציה מהאייקון שבמסך הבית.';
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if(perm !== 'granted'){
+    hint.textContent = 'ההרשאה להתראות לא אושרה. אפשר לאשר אותה בהגדרות הטלפון עבור האפליקציה.';
+    return;
+  }
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(sub){
+      try{
+        const key = sub.getKey ? sub.getKey('p256dh') : null;
+        if(!key) throw new Error('stale sub');
+      }catch(e){ await sub.unsubscribe(); sub = null; }
+    }
+    if(!sub){
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY) });
+    }
+    const json = JSON.stringify(sub.toJSON());
+    const code = btoa(unescape(encodeURIComponent(json)));
+    state.notif = { enabled: true, code: code, at: new Date().toISOString(), lastDay: (state.notif || {}).lastDay || '' };
+    save(); renderNotif();
+    reg.showNotification('מעקב צמחים', { body: 'ההתראות הופעלו. מעכשיו תזכורות הטיפול יגיעו גם לכאן.', icon: 'icon.svg' });
+    toast('ההתראות פעילות');
+  }catch(e){
+    hint.textContent = 'לא הצלחתי להפעיל התראות במכשיר הזה. ודא שהאפליקציה פתוחה מהאייקון במסך הבית ונסה שוב.';
+  }
+}
+async function testNotification(){
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const n = dueTasks().length;
+    reg.showNotification('מעקב צמחים', {
+      body: n > 0 ? ('יש ' + n + ' טיפולים שמחכים לך היום') : 'אין טיפולים להיום — הצמחים מסודרים.',
+      icon: 'icon.svg'
+    });
+  }catch(e){ toast('ההתראות לא זמינות כאן'); }
+}
+/* התראת סיכום פעם ביום, כשפותחים את האפליקציה */
+async function maybeNotifyOnOpen(){
+  try{
+    if(!state.notif || !state.notif.enabled) return;
+    if(!('Notification' in window) || Notification.permission !== 'granted') return;
+    if(state.notif.lastDay === todayStr()) return;
+    const tasks = dueTasks();
+    state.notif.lastDay = todayStr(); save();
+    if(tasks.length === 0) return;
+    const reg = await navigator.serviceWorker.ready;
+    const names = tasks.slice(0, 3).map(t => t.p.name).join(', ');
+    reg.showNotification('מעקב צמחים — טיפולים להיום', {
+      body: tasks.length + ' טיפולים מחכים: ' + names + (tasks.length > 3 ? ' ועוד' : ''),
+      icon: 'icon.svg'
+    });
+  }catch(e){ /* התראות הן תוספת — לא חוסם שימוש */ }
+}
+
 /* ================= אירועים ================= */
 $('homeSearch').addEventListener('input', renderHome);
 $('plantsSearch').addEventListener('input', renderPlants);
@@ -931,6 +1206,10 @@ $('homeAddPlant').addEventListener('click', () => openPlantForm(null));
 $('plantsAdd').addEventListener('click', () => openPlantForm(null));
 $('actPlants').addEventListener('click', () => showScreen('plants'));
 $('actToday').addEventListener('click', () => {
+  showScreen('home');
+  setTimeout(() => $('todayTitle').scrollIntoView({ behavior:'smooth', block:'start' }), 60);
+});
+$('bellBtn').addEventListener('click', () => {
   showScreen('home');
   setTimeout(() => $('todayTitle').scrollIntoView({ behavior:'smooth', block:'start' }), 60);
 });
@@ -954,9 +1233,10 @@ $('photoInput').addEventListener('change', async e => {
   if(!file) return;
   try{
     pendingPhoto = await compressImageFile(file);
-    $('f_photoPreview').innerHTML = '<img src="' + pendingPhoto + '" alt="">';
+    updateFormPhotoPreview();
   }catch(err){ toast('לא הצלחתי לקרוא את התמונה'); }
 });
+$('f_category').addEventListener('change', updateFormPhotoPreview);
 $('f_identifyBtn').addEventListener('click', async () => {
   if(!pendingPhoto){ toast('קודם בחרו או צלמו תמונה לצמח'); return; }
   closeModal('plantModal');
@@ -999,11 +1279,24 @@ $('keyClear').addEventListener('click', () => {
   state.apiKey = '';
   save(); renderSettings(); toast('המפתח נמחק');
 });
+$('notifEnable').addEventListener('click', enableNotifications);
+$('notifTest').addEventListener('click', testNotification);
+$('notifCopy').addEventListener('click', async () => {
+  const code = $('notifCode').value;
+  if(!code){ toast('אין קוד להעתקה עדיין'); return; }
+  try{ await navigator.clipboard.writeText(code); toast('הקוד הועתק'); }
+  catch(e){
+    $('notifCode').select();
+    try{ document.execCommand('copy'); toast('הקוד הועתק'); }
+    catch(e2){ toast('אפשר להעתיק את הקוד ידנית מהתיבה'); }
+  }
+});
 
 /* ================= אתחול ================= */
 $('dateLine').textContent = new Intl.DateTimeFormat('he-IL', { weekday:'long', day:'numeric', month:'long', year:'numeric' }).format(new Date());
 buildDaysPicker([]);
 renderAll();
+maybeNotifyOnOpen();
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', () => {
