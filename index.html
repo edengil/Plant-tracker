@@ -576,25 +576,25 @@ const WEEKDAYS = ['ראשון','שני','שלישי','רביעי','חמישי','
 
 /* תמונת ברירת מחדל לפי קטגוריה — כדי שכל כרטיס ייראה חי גם בלי צילום */
 const CAT_IMG = {
-  'בית': 'img/indoor.jpg',
+  'בית': 'img/plants/monstera.jpg',
   'מרפסת': 'img/hero.jpg',
-  'עשבי תיבול': 'img/herbs.jpg',
-  'פורחים': 'img/flowers.jpg',
-  'גינה': 'img/hero.jpg'
+  'עשבי תיבול': 'img/plants/basil.jpg',
+  'פורחים': 'img/plants/lavender.jpg',
+  'גינה': 'img/plants/tomato.jpg'
 };
 const PLANT_CATS = ['הכול','בית','מרפסת','עשבי תיבול','פורחים','גינה'];
 const GALLERY_CATS = ['הכול','בית','עשבי תיבול','פורחים','גינה'];
 const GALLERY = [
-  { name:'מונסטרה', cat:'בית', img:'img/indoor.jpg', water:7, fert:30, loc:'בית, ליד חלון מואר' },
-  { name:'פוטוס', cat:'בית', img:'img/indoor.jpg', water:6, fert:30, loc:'בית, מדף או תלוי' },
-  { name:'בזיליקום', cat:'עשבי תיבול', img:'img/herbs.jpg', water:2, fert:14, loc:'אדן חלון שטוף שמש' },
-  { name:'נענע', cat:'עשבי תיבול', img:'img/herbs.jpg', water:2, fert:21, loc:'מרפסת, חצי צל' },
-  { name:'רוזמרין', cat:'עשבי תיבול', img:'img/herbs.jpg', water:5, fert:30, loc:'מרפסת שטופת שמש' },
-  { name:'לבנדר', cat:'פורחים', img:'img/flowers.jpg', water:4, fert:30, loc:'גינה או מרפסת' },
-  { name:'הידראנגאה', cat:'פורחים', img:'img/flowers.jpg', water:3, fert:21, loc:'גינה, חצי צל' },
-  { name:'דליה', cat:'פורחים', img:'img/flowers.jpg', water:3, fert:14, loc:'גינה שטופת שמש' },
-  { name:'עגבנייה', cat:'גינה', img:'img/hero.jpg', water:2, fert:14, loc:'גינת ירק שטופת שמש' },
-  { name:'עץ זית', cat:'גינה', img:'img/hero.jpg', water:7, fert:45, loc:'מרפסת או גינה' }
+  { name:'מונסטרה', cat:'בית', img:'img/plants/monstera.jpg', water:7, fert:30, loc:'בית, ליד חלון מואר' },
+  { name:'פוטוס', cat:'בית', img:'img/plants/pothos.jpg', water:6, fert:30, loc:'בית, מדף או תלוי' },
+  { name:'בזיליקום', cat:'עשבי תיבול', img:'img/plants/basil.jpg', water:2, fert:14, loc:'אדן חלון שטוף שמש' },
+  { name:'נענע', cat:'עשבי תיבול', img:'img/plants/mint.jpg', water:2, fert:21, loc:'מרפסת, חצי צל' },
+  { name:'רוזמרין', cat:'עשבי תיבול', img:'img/plants/rosemary.jpg', water:5, fert:30, loc:'מרפסת שטופת שמש' },
+  { name:'לבנדר', cat:'פורחים', img:'img/plants/lavender.jpg', water:4, fert:30, loc:'גינה או מרפסת' },
+  { name:'הידראנגאה', cat:'פורחים', img:'img/plants/hydrangea.jpg', water:3, fert:21, loc:'גינה, חצי צל' },
+  { name:'דליה', cat:'פורחים', img:'img/plants/dahlia.jpg', water:3, fert:14, loc:'גינה שטופת שמש' },
+  { name:'עגבנייה', cat:'גינה', img:'img/plants/tomato.jpg', water:2, fert:14, loc:'גינת ירק שטופת שמש' },
+  { name:'עץ זית', cat:'גינה', img:'img/plants/olive.jpg', water:7, fert:45, loc:'מרפסת או גינה' }
 ];
 
 function defaultState(){ return { plants:[], zones:[], systemName:'', apiKey:'', notif:null }; }
