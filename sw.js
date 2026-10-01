@@ -1,5 +1,5 @@
 /* מעקב צמחים — Service Worker בסיסי: שומר את קבצי האפליקציה לזמינות לא מקוונת */
-const CACHE_NAME = 'plant-tracker-v7';
+const CACHE_NAME = 'plant-tracker-v8';
 const APP_SHELL = [
   './',
   './index.html',
