@@ -1,10 +1,11 @@
 /* מעקב צמחים — Service Worker בסיסי: שומר את קבצי האפליקציה לזמינות לא מקוונת */
-const CACHE_NAME = 'plant-tracker-v3';
+const CACHE_NAME = 'plant-tracker-v4';
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './icon.svg'
+  './icon.svg',
+  './img/hero.jpg'
 ];
 
 self.addEventListener('install', (event) => {
