@@ -566,6 +566,47 @@ a{color:var(--green-dark)}
     </div>
     <h3 style="margin-top:20px;font-size:16px;font-weight:800">היסטוריית טיפולים</h3>
     <div id="d_history"></div>
+    <h3 style="margin-top:20px;font-size:16px;font-weight:800">יומן גדילה</h3>
+    <div class="btn-row" style="margin-bottom:10px">
+      <button class="btn secondary" id="d_journalAdd">הוסף תמונה ליומן</button>
+      <button class="btn secondary" id="d_compareBtn" style="display:none">השוואת לפני / אחרי</button>
+    </div>
+    <div id="d_journal"></div>
+  </div>
+</div>
+<input type="file" class="hidden-input" id="journalPhotoInput" accept="image/*">
+
+<!-- ================= JOURNAL MODAL ================= -->
+<div class="modal-backdrop" id="journalModal">
+  <div class="modal">
+    <button class="close-x" data-close="journalModal">✕</button>
+    <h2>תמונה חדשה ליומן</h2>
+    <div class="form-photo" id="j_preview" style="margin-bottom:14px"></div>
+    <div class="field">
+      <label for="j_note">הערה (לא חובה)</label>
+      <textarea id="j_note" rows="2" placeholder="למשל: העלים נראים ירוקים ובריאים"></textarea>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="journalSave">שמור ביומן</button>
+      <button class="btn secondary" data-close="journalModal">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= COMPARE MODAL ================= -->
+<div class="modal-backdrop" id="compareModal">
+  <div class="modal">
+    <button class="close-x" data-close="compareModal">✕</button>
+    <h2>השוואת לפני / אחרי</h2>
+    <p class="note" id="compareHint">בחרו שתי תמונות מהיומן כדי להשוות ביניהן.</p>
+    <div id="compareView" style="display:none;margin-top:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><img id="cmpA" style="width:100%;border-radius:12px" alt="לפני"><p class="note" id="cmpADate" style="text-align:center"></p><p class="note" style="text-align:center;font-weight:800">לפני</p></div>
+        <div><img id="cmpB" style="width:100%;border-radius:12px" alt="אחרי"><p class="note" id="cmpBDate" style="text-align:center"></p><p class="note" style="text-align:center;font-weight:800">אחרי</p></div>
+      </div>
+      <div class="btn-row" style="margin-top:12px"><button class="btn secondary" id="compareReset">בחירה מחדש</button></div>
+    </div>
+    <div id="comparePick" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px"></div>
   </div>
 </div>
 
@@ -945,6 +986,80 @@ function markCare(plantId, type){
 let editingPlantId = null;
 let pendingPhoto = null;
 let lastIdentifyPhoto = null;
+let pendingJournalPhoto = null;
+let pendingJournalPlantId = null;
+let compareSel = [];
+
+/* ================= יומן גדילה ================= */
+function getJournal(p){ if(!Array.isArray(p.journal)) p.journal = []; return p.journal; }
+function renderJournal(p){
+  const j = getJournal(p).slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  $('d_compareBtn').style.display = j.length >= 2 ? '' : 'none';
+  if(j.length === 0){
+    $('d_journal').innerHTML = '<p class="note">עדיין אין תמונות ביומן. הוסיפו תמונה כדי לעקוב אחרי הגדילה לאורך זמן.</p>';
+    return;
+  }
+  $('d_journal').innerHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">'
+    + j.map(e => '<div class="journal-item" style="position:relative">'
+      + '<img src="' + e.photo + '" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px" alt="">'
+      + '<div class="note" style="font-size:11px;margin-top:2px">' + esc(fmtDate(e.date)) + (e.note ? ' · ' + esc(e.note) : '') + '</div>'
+      + '<button class="journal-del" data-jdel="' + e.id + '" aria-label="מחק תמונה" style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:26px;height:26px;font-size:14px;line-height:1">✕</button>'
+      + '</div>').join('') + '</div>';
+  $('d_journal').querySelectorAll('[data-jdel]').forEach(b => b.addEventListener('click', ev => {
+    ev.stopPropagation();
+    if(!confirm('למחוק את התמונה הזו מהיומן?')) return;
+    const pl = state.plants.find(x => x.id === p.id);
+    if(pl){ pl.journal = getJournal(pl).filter(x => x.id !== b.dataset.jdel); save(); openDetail(p.id); }
+  }));
+}
+function openJournalPhoto(plantId){
+  pendingJournalPlantId = plantId;
+  $('journalPhotoInput').click();
+}
+async function handleJournalPhoto(file){
+  if(!file) return;
+  try{
+    pendingJournalPhoto = await compressImageFile(file);
+    $('j_preview').innerHTML = '<img src="' + pendingJournalPhoto + '" style="width:100%;border-radius:12px" alt="">';
+    $('j_note').value = '';
+    openModal('journalModal');
+  }catch(e){ toast('לא הצלחתי לקרוא את התמונה'); }
+}
+function saveJournalEntry(){
+  const p = state.plants.find(x => x.id === pendingJournalPlantId);
+  if(!p || !pendingJournalPhoto){ toast('משהו השתבש — נסו שוב'); return; }
+  getJournal(p).push({ id: uid(), date: todayStr(), photo: pendingJournalPhoto, note: $('j_note').value.trim() });
+  save(); closeModal('journalModal'); openDetail(p.id);
+  pendingJournalPhoto = null; pendingJournalPlantId = null;
+  toast('התמונה נוספה ליומן');
+}
+function openCompare(plantId){
+  const p = state.plants.find(x => x.id === plantId);
+  if(!p) return;
+  const j = getJournal(p).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  compareSel = [];
+  $('compareView').style.display = 'none';
+  $('compareHint').style.display = '';
+  const pick = $('comparePick');
+  pick.innerHTML = j.map(e => '<button class="cmp-pick" data-cmp="' + e.id + '" style="border:2px solid transparent;border-radius:12px;padding:0;background:none">'
+    + '<img src="' + e.photo + '" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px" alt="">'
+    + '<div class="note" style="font-size:11px">' + esc(fmtDate(e.date)) + '</div></button>').join('');
+  pick.querySelectorAll('[data-cmp]').forEach(b => b.addEventListener('click', () => {
+    const id = b.dataset.cmp;
+    if(compareSel.includes(id)){ compareSel = compareSel.filter(x => x !== id); b.style.borderColor = 'transparent'; }
+    else if(compareSel.length < 2){ compareSel.push(id); b.style.borderColor = 'var(--green)'; }
+    if(compareSel.length === 2){
+      const entries = compareSel.map(x => j.find(e => e.id === x)).filter(Boolean)
+        .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      $('cmpA').src = entries[0].photo; $('cmpADate').textContent = fmtDate(entries[0].date) + (entries[0].note ? ' · ' + entries[0].note : '');
+      $('cmpB').src = entries[1].photo; $('cmpBDate').textContent = fmtDate(entries[1].date) + (entries[1].note ? ' · ' + entries[1].note : '');
+      $('compareView').style.display = 'block';
+      $('compareHint').style.display = 'none';
+      pick.querySelectorAll('[data-cmp]').forEach(x => x.style.borderColor = 'transparent');
+    }
+  }));
+  openModal('compareModal');
+}
 
 function refreshZoneSelect(selectedId){
   const sel = $('f_zone');
@@ -1035,6 +1150,7 @@ function openDetail(plantId){
         const d = new Date(h.at);
         return '<div class="history-item"><span>' + (h.type === 'water' ? '<span class="chip auto">השקיה</span>' : '<span class="chip due">דישון</span>') + '</span><span class="note">' + new Intl.DateTimeFormat('he-IL',{day:'numeric',month:'numeric',year:'numeric'}).format(d) + '</span></div>';
       }).join('');
+  renderJournal(p);
   openModal('detailModal');
 }
 
@@ -1306,6 +1422,22 @@ $('d_delete').addEventListener('click', () => {
   if(!confirm('למחוק את הצמח "' + p.name + '"? גם היסטוריית הטיפולים שלו תימחק.')) return;
   state.plants = state.plants.filter(x => x.id !== id);
   save(); closeModal('detailModal'); renderAll(); toast('הצמח נמחק');
+});
+
+/* יומן גדילה */
+$('d_journalAdd').addEventListener('click', () => openJournalPhoto($('detailModal').dataset.plantId));
+$('d_compareBtn').addEventListener('click', () => openCompare($('detailModal').dataset.plantId));
+$('journalPhotoInput').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if(f) handleJournalPhoto(f);
+});
+$('journalSave').addEventListener('click', saveJournalEntry);
+$('compareReset').addEventListener('click', () => {
+  compareSel = [];
+  $('compareView').style.display = 'none';
+  $('compareHint').style.display = '';
+  $('comparePick').querySelectorAll('[data-cmp]').forEach(x => x.style.borderColor = 'transparent');
 });
 
 /* השקיה */
