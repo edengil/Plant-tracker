@@ -364,6 +364,19 @@ a{color:var(--green-dark)}
   <!-- ================= IRRIGATION ================= -->
   <section class="screen" id="screen-irrigation">
     <h2 class="section-title">מערכת השקיה</h2>
+    <div class="card" id="tuyaCard">
+      <h3>בקר השקיה חי</h3>
+      <div class="field">
+        <label for="tuyaDeviceId">מזהה הבקר</label>
+        <input type="text" id="tuyaDeviceId" dir="ltr" placeholder="bf85d5de5a889a5ce5rfft">
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="tuyaRefresh">רענן סטטוס</button>
+        <button class="btn secondary" id="tuyaSaveId">שמור מזהה</button>
+      </div>
+      <p class="note" id="tuyaStatus">לא נטען עדיין — התחבר עם גוגל בהגדרות ואז לחץ "רענן סטטוס".</p>
+      <div id="tuyaZones"></div>
+    </div>
     <div class="card">
       <h3>המערכת שלי</h3>
       <div class="field">
@@ -371,7 +384,7 @@ a{color:var(--green-dark)}
         <input type="text" id="sysName" placeholder="למשל: בקר השקיה גינה">
       </div>
       <button class="btn" id="sysSave">שמור</button>
-      <p class="note" style="margin-top:10px">האפליקציה הזו מתעדת את תוכנית ההשקיה. ההפעלה והשליטה בפועל נשארות באפליקציית סמארטלייף — אין כאן חיבור חי למערכת.</p>
+      <p class="note" style="margin-top:10px">כאן מתעדים את תוכנית ההשקיה. הסטטוס החי והשליטה בבקר נמצאים בכרטיס "בקר השקיה חי" למעלה — דורש התחברות עם גוגל.</p>
     </div>
 
     <h2 class="section-title">אזורי השקיה <button class="link-btn" id="zoneAddBtn">+ הוסף אזור</button></h2>
@@ -699,7 +712,7 @@ const GALLERY = [
   { name:'עץ זית', cat:'גינה', img:'img/plants/olive.jpg', water:7, fert:45, loc:'מרפסת או גינה' }
 ];
 
-function defaultState(){ return { plants:[], zones:[], systemName:'', apiKey:'', notif:null, deletedPlants:[], settingsUpdatedAt:null }; }
+function defaultState(){ return { plants:[], zones:[], systemName:'', apiKey:'', tuyaDeviceId:'bf85d5de5a889a5ce5rfft', notif:null, deletedPlants:[], settingsUpdatedAt:null }; }
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
@@ -747,7 +760,7 @@ function stampChanges(){
     const h = JSON.stringify(c);
     if(plantHashCache[p.id] !== h){ p.updatedAt = now; plantHashCache[p.id] = h; }
   }
-  const sObj = { zones: state.zones, systemName: state.systemName };
+  const sObj = { zones: state.zones, systemName: state.systemName, tuyaDeviceId: state.tuyaDeviceId };
   const sh = JSON.stringify(sObj);
   if(stampChanges._s !== sh){ stampChanges._s = sh; state.settingsUpdatedAt = now; }
 }
@@ -769,6 +782,7 @@ async function pushCloud(){
       plants: state.plants,
       zones: state.zones,
       systemName: state.systemName,
+      tuyaDeviceId: state.tuyaDeviceId || '',
       settingsUpdatedAt: state.settingsUpdatedAt || null,
       deletedPlants: state.deletedPlants || [],
       updatedAt: new Date().toISOString()
@@ -797,13 +811,14 @@ function mergeCloud(cloud){
   if((cloud.settingsUpdatedAt || '') > (state.settingsUpdatedAt || '')){
     state.zones = cloud.zones || [];
     state.systemName = cloud.systemName || '';
+    state.tuyaDeviceId = cloud.tuyaDeviceId || state.tuyaDeviceId || '';
     state.settingsUpdatedAt = cloud.settingsUpdatedAt;
   }
   const cutoff = new Date(Date.now() - 90 * 864e5).toISOString();
   state.deletedPlants = Object.keys(tombs).map(id => ({ id: id, deletedAt: tombs[id] })).filter(d => d.deletedAt > cutoff);
   plantHashCache = {};
   for(const p of state.plants){ const c = Object.assign({}, p); delete c.updatedAt; plantHashCache[p.id] = JSON.stringify(c); }
-  stampChanges._s = JSON.stringify({ zones: state.zones, systemName: state.systemName });
+  stampChanges._s = JSON.stringify({ zones: state.zones, systemName: state.systemName, tuyaDeviceId: state.tuyaDeviceId });
 }
 async function pullCloud(){
   if(!fbUser || !fbDb) return;
@@ -1083,6 +1098,7 @@ function renderPlants(){
 let editingZoneId = null;
 function renderIrrigation(){
   $('sysName').value = state.systemName || '';
+  if($('tuyaDeviceId') && !$('tuyaDeviceId').value) $('tuyaDeviceId').value = state.tuyaDeviceId || '';
   const zl = $('zonesList');
   if(state.zones.length === 0){
     zl.innerHTML = '<div class="empty">' + EMPTY_ART + 'עוד לא הוגדרו אזורי השקיה.<br>הוסף אזור כדי לשייך אליו צמחים להשקיה אוטומטית.</div>';
@@ -1108,6 +1124,71 @@ function renderIrrigation(){
   }));
   zl.querySelectorAll('[data-zone-edit]').forEach(b => b.addEventListener('click', () => openZoneForm(b.dataset.zoneEdit)));
   zl.querySelectorAll('[data-zone-del]').forEach(b => b.addEventListener('click', () => deleteZone(b.dataset.zoneDel)));
+}
+
+/* ================= בקר השקיה חי (Tuya) ================= */
+const TUYA_PROXY = 'https://plant-tracker-tuya.edengil94.workers.dev';
+const TUYA_ZONE_NAMES = ['אזור A', 'אזור B', 'אזור C'];
+let tuyaState = null;
+async function tuyaHeaders(){
+  if(!fbUser) return null;
+  try{ return { 'Authorization': 'Bearer ' + await fbUser.getIdToken(), 'Content-Type': 'application/json' }; }
+  catch(e){ return null; }
+}
+function tuyaDeviceId(){ return (($('tuyaDeviceId') || {}).value || state.tuyaDeviceId || '').trim(); }
+async function refreshTuyaStatus(){
+  const st = $('tuyaStatus');
+  const h = await tuyaHeaders();
+  if(!h){ st.textContent = 'צריך להתחבר עם גוגל (במסך ההגדרות) כדי לראות סטטוס חי.'; toast('התחבר עם גוגל קודם'); return; }
+  const id = tuyaDeviceId();
+  if(!id){ toast('חסר מזהה בקר'); return; }
+  st.textContent = 'טוען סטטוס מהבקר…';
+  try{
+    const r = await fetch(TUYA_PROXY + '/api/status/' + encodeURIComponent(id), { headers: h });
+    if(r.status === 401){ st.textContent = 'אין הרשאה — החשבון המחובר לא מורשה לשלוט בבקר.'; tuyaState = null; renderTuyaZones(); return; }
+    const j = await r.json();
+    if(!j.success){ st.textContent = 'שגיאה בקריאת הסטטוס מהבקר.'; return; }
+    tuyaState = {};
+    (j.result || []).forEach(s => { tuyaState[s.code] = s.value; });
+    renderTuyaZones();
+    st.textContent = 'עודכן: ' + new Date().toLocaleTimeString('he-IL');
+  }catch(e){ st.textContent = 'שגיאת רשת — בדוק חיבור ונסה שוב.'; }
+}
+function renderTuyaZones(){
+  const box = $('tuyaZones');
+  if(!box) return;
+  if(!tuyaState){ box.innerHTML = ''; return; }
+  box.innerHTML = [1,2,3].map(i => {
+    const on = !!tuyaState['switch_' + i];
+    const cd = tuyaState['countdown_' + i];
+    return '<div class="zone-head" style="margin-top:10px"><div>'
+      + '<div class="zone-name">' + TUYA_ZONE_NAMES[i-1] + '</div>'
+      + '<div class="note">' + (on ? 'פועל עכשיו 💧' : 'כבוי') + (cd ? ' · טיימר: ' + cd + ' שנ׳' : '') + '</div>'
+      + '</div>'
+      + '<label class="switch"><input type="checkbox" data-tuya-zone="' + i + '"' + (on ? ' checked' : '') + '><span class="track"></span></label>'
+      + '</div>';
+  }).join('');
+  box.querySelectorAll('[data-tuya-zone]').forEach(t => t.addEventListener('change', () => {
+    toggleTuyaZone(Number(t.dataset.tuyaZone), t.checked);
+  }));
+}
+async function toggleTuyaZone(i, on){
+  const name = TUYA_ZONE_NAMES[i-1];
+  if(!confirm((on ? 'להפעיל את ' : 'לכבות את ') + name + '?')){ renderTuyaZones(); return; }
+  const h = await tuyaHeaders();
+  if(!h){ renderTuyaZones(); return; }
+  const id = tuyaDeviceId();
+  if(!id){ renderTuyaZones(); return; }
+  try{
+    const r = await fetch(TUYA_PROXY + '/api/control/' + encodeURIComponent(id), {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ code: 'switch_' + i, value: on })
+    });
+    const j = await r.json();
+    if(j && j.success){ toast(name + (on ? ' הופעל 💧' : ' כובה')); }
+    else { toast('הפקודה נכשלה — נסה שוב'); }
+  }catch(e){ toast('שגיאת רשת'); }
+  refreshTuyaStatus();
 }
 
 function buildDaysPicker(selected){
@@ -1887,6 +1968,11 @@ $('sysSave').addEventListener('click', () => {
 $('zoneAddBtn').addEventListener('click', () => openZoneForm(null));
 $('zoneCancel').addEventListener('click', closeZoneForm);
 $('zoneSave').addEventListener('click', saveZone);
+$('tuyaRefresh').addEventListener('click', refreshTuyaStatus);
+$('tuyaSaveId').addEventListener('click', () => {
+  state.tuyaDeviceId = ($('tuyaDeviceId').value || '').trim();
+  save(); toast('מזהה הבקר נשמר');
+});
 
 /* הגדרות */
 $('keySave').addEventListener('click', () => {
