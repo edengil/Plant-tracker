@@ -372,6 +372,7 @@ a{color:var(--green-dark)}
       </div>
       <div class="btn-row">
         <button class="btn" id="tuyaRefresh">רענן סטטוס</button>
+        <button class="btn secondary" id="tuyaImport">ייבא הגדרות מהבקר</button>
         <button class="btn secondary" id="tuyaSaveId">שמור מזהה</button>
       </div>
       <p class="note" id="tuyaStatus">לא נטען עדיין — התחבר עם גוגל בהגדרות ואז לחץ "רענן סטטוס".</p>
@@ -1110,7 +1111,7 @@ function renderIrrigation(){
     const nxt = nextZoneRun(z);
     return '<div class="card"><div class="zone-head"><div>'
       + '<div class="zone-name">' + esc(z.name) + '</div>'
-      + '<div class="note">' + esc(days || 'לא נבחרו ימים') + ' · מתחיל ב־' + esc(z.time || '06:00') + ' · ' + esc(z.durationMin) + ' דקות</div>'
+      + '<div class="note">' + esc(days || 'לא נבחרו ימים') + ' · מתחיל ב־' + esc(z.time || '06:00') + ' · ' + esc(z.durationMin) + ' דקות' + (z.tuyaZone ? ' · 🔗 בקר' : '') + '</div>'
       + '<div class="note">' + count + ' צמחים משויכים' + (z.active && nxt ? ' · השקיה הבאה: ' + esc(fmtDateTime(nxt)) : (z.active ? '' : ' · האזור מושבת')) + '</div>'
       + '</div>'
       + '<label class="switch"><input type="checkbox" data-zone-toggle="' + z.id + '"' + (z.active ? ' checked' : '') + '><span class="track"></span></label>'
@@ -1171,6 +1172,32 @@ function renderTuyaZones(){
   box.querySelectorAll('[data-tuya-zone]').forEach(t => t.addEventListener('change', () => {
     toggleTuyaZone(Number(t.dataset.tuyaZone), t.checked);
   }));
+}
+/* ייבוא הגדרות מהבקר: קורא את טיימרי האזורים ויוצר/מעדכן אזורי השקיה באפליקציה.
+   אחרי הייבוא אפשר לערוך כל אזור כרגיל (שם, ימים, שעה, משך). */
+async function importTuyaSettings(){
+  const h = await tuyaHeaders();
+  if(!h){ toast('התחבר עם גוגל קודם'); return; }
+  const id = tuyaDeviceId();
+  if(!id){ toast('חסר מזהה בקר'); return; }
+  toast('מייבא הגדרות מהבקר…');
+  try{
+    const r = await fetch(TUYA_PROXY + '/api/status/' + encodeURIComponent(id), { headers: h });
+    if(r.status === 401){ toast('אין הרשאה — החשבון לא מורשה'); return; }
+    const j = await r.json();
+    if(!j.success){ toast('הייבוא נכשל'); return; }
+    const vals = {};
+    (j.result || []).forEach(s => { vals[s.code] = s.value; });
+    for(let i = 1; i <= 3; i++){
+      const cd = Number(vals['countdown_' + i]);
+      const mins = cd > 0 ? Math.max(1, Math.round(cd / 60)) : 30;
+      const z = state.zones.find(z => z.tuyaZone === i);
+      if(z){ z.durationMin = mins; }
+      else { state.zones.push({ id: uid(), name: TUYA_ZONE_NAMES[i-1], days: [], time: '06:00', durationMin: mins, active: true, tuyaZone: i }); }
+    }
+    save(); renderAll();
+    toast('יובאו 3 אזורים מהבקר — אפשר לערוך אותם כרגיל');
+  }catch(e){ toast('שגיאת רשת — נסה שוב'); }
 }
 async function toggleTuyaZone(i, on){
   const name = TUYA_ZONE_NAMES[i-1];
@@ -1969,6 +1996,7 @@ $('zoneAddBtn').addEventListener('click', () => openZoneForm(null));
 $('zoneCancel').addEventListener('click', closeZoneForm);
 $('zoneSave').addEventListener('click', saveZone);
 $('tuyaRefresh').addEventListener('click', refreshTuyaStatus);
+$('tuyaImport').addEventListener('click', importTuyaSettings);
 $('tuyaSaveId').addEventListener('click', () => {
   state.tuyaDeviceId = ($('tuyaDeviceId').value || '').trim();
   save(); toast('מזהה הבקר נשמר');
