@@ -954,6 +954,7 @@ function showScreen(name){
   $('screen-' + name).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.nav === name));
   window.scrollTo({ top:0 });
+  if(name === 'irrigation' && typeof fbUser !== 'undefined' && fbUser && !tuyaState) refreshTuyaStatus();
 }
 document.querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => showScreen(b.dataset.nav)));
 
