@@ -1132,21 +1132,34 @@ function renderIrrigation(){
 const TUYA_PROXY = 'https://plant-tracker-tuya.edengil94.workers.dev';
 const TUYA_ZONE_NAMES = ['אזור A', 'אזור B', 'אזור C'];
 let tuyaState = null;
-async function tuyaHeaders(){
+async function tuyaHeaders(force){
   if(!fbUser) return null;
-  try{ return { 'Authorization': 'Bearer ' + await fbUser.getIdToken(), 'Content-Type': 'application/json' }; }
+  try{ return { 'Authorization': 'Bearer ' + await fbUser.getIdToken(!!force), 'Content-Type': 'application/json' }; }
   catch(e){ return null; }
+}
+/* קריאה לפרוקסי טויה: אם התקבל 401 מנסים שוב פעם אחת עם טוקן מרוענן בכוח
+   (טוקן Firebase פג תוקף אחרי שעה — זה היה מקור שגיאת "אין הרשאה"). */
+async function tuyaFetch(path, opts){
+  opts = opts || {};
+  let h = await tuyaHeaders(false);
+  if(!h) return null;
+  const send = hd => fetch(TUYA_PROXY + path, Object.assign({}, opts, { headers: Object.assign({}, hd, opts.headers) }));
+  let r = await send(h);
+  if(r.status === 401){
+    const h2 = await tuyaHeaders(true);
+    if(h2) r = await send(h2);
+  }
+  return r;
 }
 function tuyaDeviceId(){ return (($('tuyaDeviceId') || {}).value || state.tuyaDeviceId || '').trim(); }
 async function refreshTuyaStatus(){
   const st = $('tuyaStatus');
-  const h = await tuyaHeaders();
-  if(!h){ st.textContent = 'צריך להתחבר עם גוגל (במסך ההגדרות) כדי לראות סטטוס חי.'; toast('התחבר עם גוגל קודם'); return; }
   const id = tuyaDeviceId();
   if(!id){ toast('חסר מזהה בקר'); return; }
   st.textContent = 'טוען סטטוס מהבקר…';
   try{
-    const r = await fetch(TUYA_PROXY + '/api/status/' + encodeURIComponent(id), { headers: h });
+    const r = await tuyaFetch('/api/status/' + encodeURIComponent(id));
+    if(!r){ st.textContent = 'צריך להתחבר עם גוגל (במסך ההגדרות) כדי לראות סטטוס חי.'; toast('התחבר עם גוגל קודם'); return; }
     if(r.status === 401){ st.textContent = 'אין הרשאה — החשבון המחובר לא מורשה לשלוט בבקר.'; tuyaState = null; renderTuyaZones(); return; }
     const j = await r.json();
     if(!j.success){ st.textContent = 'שגיאה בקריאת הסטטוס מהבקר.'; return; }
@@ -1177,13 +1190,12 @@ function renderTuyaZones(){
 /* ייבוא הגדרות מהבקר: קורא את טיימרי האזורים ויוצר/מעדכן אזורי השקיה באפליקציה.
    אחרי הייבוא אפשר לערוך כל אזור כרגיל (שם, ימים, שעה, משך). */
 async function importTuyaSettings(){
-  const h = await tuyaHeaders();
-  if(!h){ toast('התחבר עם גוגל קודם'); return; }
   const id = tuyaDeviceId();
   if(!id){ toast('חסר מזהה בקר'); return; }
   toast('מייבא הגדרות מהבקר…');
   try{
-    const r = await fetch(TUYA_PROXY + '/api/status/' + encodeURIComponent(id), { headers: h });
+    const r = await tuyaFetch('/api/status/' + encodeURIComponent(id));
+    if(!r){ toast('התחבר עם גוגל קודם'); return; }
     if(r.status === 401){ toast('אין הרשאה — החשבון לא מורשה'); return; }
     const j = await r.json();
     if(!j.success){ toast('הייבוא נכשל'); return; }
@@ -1203,15 +1215,14 @@ async function importTuyaSettings(){
 async function toggleTuyaZone(i, on){
   const name = TUYA_ZONE_NAMES[i-1];
   if(!confirm((on ? 'להפעיל את ' : 'לכבות את ') + name + '?')){ renderTuyaZones(); return; }
-  const h = await tuyaHeaders();
-  if(!h){ renderTuyaZones(); return; }
   const id = tuyaDeviceId();
   if(!id){ renderTuyaZones(); return; }
   try{
-    const r = await fetch(TUYA_PROXY + '/api/control/' + encodeURIComponent(id), {
-      method: 'POST', headers: h,
+    const r = await tuyaFetch('/api/control/' + encodeURIComponent(id), {
+      method: 'POST',
       body: JSON.stringify({ code: 'switch_' + i, value: on })
     });
+    if(!r){ renderTuyaZones(); return; }
     const j = await r.json();
     if(j && j.success){ toast(name + (on ? ' הופעל 💧' : ' כובה')); }
     else { toast('הפקודה נכשלה — נסה שוב'); }
