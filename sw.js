@@ -1,5 +1,5 @@
-/* מעקב צמחים — Service Worker בסיסי: שומר את קבצי האפליקציה לזמינות לא מקוונת */
-const CACHE_NAME = 'plant-tracker-v10';
+/* מעקב צמחים — Service Worker: שומר את קבצי האפליקציה לזמינות לא מקוונת */
+const CACHE_NAME = 'plant-tracker-v12';
 const APP_SHELL = [
   './',
   './index.html',
@@ -29,16 +29,26 @@ self.addEventListener('fetch', (event) => {
   // רק בקשות מקומיות של האפליקציה עצמה עוברות דרך המטמון.
   // קריאות חיצוניות (למשל זיהוי פלנטנט) עוברות ישירות לרשת.
   if (url.origin !== self.location.origin || event.request.method !== 'GET') return;
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const network = fetch(event.request).then((response) => {
-        if (response && response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        }
+  const isDoc = url.pathname.endsWith('/') || url.pathname.endsWith('.html');
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    if (isDoc) {
+      // מסמכים: רשת תחילה כדי שעדכונים יופיעו מיד; מטמון כגיבוי לאופליין.
+      try {
+        const response = await fetch(event.request);
+        if (response && response.ok) cache.put(event.request, response.clone());
         return response;
-      }).catch(() => cached);
-      return cached || network;
-    })
-  );
+      } catch (e) {
+        const cached = await cache.match(event.request);
+        return cached || Response.error();
+      }
+    }
+    // נכסים סטטיים: מטמון תחילה, רענון ברקע.
+    const cached = await cache.match(event.request);
+    const network = fetch(event.request).then((response) => {
+      if (response && response.ok) cache.put(event.request, response.clone());
+      return response;
+    }).catch(() => cached);
+    return cached || network;
+  })());
 });
