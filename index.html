@@ -379,6 +379,49 @@ a{color:var(--green-dark)}
       <p class="note" id="tuyaWeather" style="display:none;margin-top:6px"></p>
       <div id="tuyaZones"></div>
     </div>
+    <div class="card" id="schedCard">
+      <h3>מתזמן השקיה אוטומטי</h3>
+      <p class="note" style="color:#a3541a">הלוזים כאן מחליפים את הלוזים המקומיים בבקר — חובה לכבות אותם בסמארט לייף (הבקר ← Schedule ← כבה כל לוז) כדי למנוע השקיה כפולה.</p>
+      <div id="schedList"></div>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn" id="schedAddBtn">+ הוסף לוז השקיה</button>
+      </div>
+      <div id="schedFormCard" style="display:none;margin-top:10px">
+        <h4 id="schedFormTitle">לוז חדש</h4>
+        <div class="field">
+          <label>אזור בבקר</label>
+          <div class="radio-row" id="schedZonePick">
+            <label><input type="radio" name="schedZone" value="1" checked> אזור A</label>
+            <label><input type="radio" name="schedZone" value="2"> אזור B</label>
+            <label><input type="radio" name="schedZone" value="3"> אזור C</label>
+          </div>
+        </div>
+        <div class="field">
+          <label>ימי השקיה</label>
+          <div class="days-picker" id="schedDays"></div>
+        </div>
+        <div class="field">
+          <label for="schedTime">שעת התחלה</label>
+          <input type="time" id="schedTime" value="06:00">
+        </div>
+        <div class="field">
+          <label for="schedDuration">משך (דקות)</label>
+          <input type="number" id="schedDuration" min="1" max="180" value="10">
+        </div>
+        <div class="field">
+          <label>הלוז פעיל</label>
+          <div class="radio-row">
+            <label><input type="radio" name="schedActive" value="yes" checked> פעיל</label>
+            <label><input type="radio" name="schedActive" value="no"> כבוי</label>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="schedSave">שמור לוז</button>
+          <button class="btn secondary" id="schedCancel">ביטול</button>
+        </div>
+      </div>
+      <p class="note" id="schedStatus"></p>
+    </div>
     <div class="card">
       <h3>המערכת שלי</h3>
       <div class="field">
@@ -714,7 +757,7 @@ const GALLERY = [
   { name:'עץ זית', cat:'גינה', img:'img/plants/olive.jpg', water:7, fert:45, loc:'מרפסת או גינה' }
 ];
 
-function defaultState(){ return { plants:[], zones:[], systemName:'', apiKey:'', tuyaDeviceId:'bf85d5de5a889a5ce5rfft', notif:null, deletedPlants:[], settingsUpdatedAt:null }; }
+function defaultState(){ return { plants:[], zones:[], schedules:[], systemName:'', apiKey:'', tuyaDeviceId:'bf85d5de5a889a5ce5rfft', notif:null, deletedPlants:[], settingsUpdatedAt:null }; }
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
@@ -762,7 +805,7 @@ function stampChanges(){
     const h = JSON.stringify(c);
     if(plantHashCache[p.id] !== h){ p.updatedAt = now; plantHashCache[p.id] = h; }
   }
-  const sObj = { zones: state.zones, systemName: state.systemName, tuyaDeviceId: state.tuyaDeviceId };
+  const sObj = { zones: state.zones, schedules: state.schedules, systemName: state.systemName, tuyaDeviceId: state.tuyaDeviceId };
   const sh = JSON.stringify(sObj);
   if(stampChanges._s !== sh){ stampChanges._s = sh; state.settingsUpdatedAt = now; }
 }
@@ -812,6 +855,7 @@ function mergeCloud(cloud){
   state.plants = merged;
   if((cloud.settingsUpdatedAt || '') > (state.settingsUpdatedAt || '')){
     state.zones = cloud.zones || [];
+    state.schedules = cloud.schedules || [];
     state.systemName = cloud.systemName || '';
     state.tuyaDeviceId = cloud.tuyaDeviceId || state.tuyaDeviceId || '';
     state.settingsUpdatedAt = cloud.settingsUpdatedAt;
@@ -852,7 +896,7 @@ async function signInGoogle(){
 function onAuthChanged(user){
   fbUser = user || null;
   updateSyncUI();
-  if(fbUser){ pullCloud(); }
+  if(fbUser){ pullCloud().then(() => pushSchedulesToWorker()); }
   else { setSyncStatus('off'); }
 }
 function setSyncStatus(s){
@@ -1113,6 +1157,7 @@ let editingZoneId = null;
 function renderIrrigation(){
   $('sysName').value = state.systemName || '';
   if($('tuyaDeviceId') && !$('tuyaDeviceId').value) $('tuyaDeviceId').value = state.tuyaDeviceId || '';
+  renderSchedules();
   const zl = $('zonesList');
   if(state.zones.length === 0){
     zl.innerHTML = '<div class="empty">' + EMPTY_ART + 'עוד לא הוגדרו אזורי השקיה.<br>הוסף אזור כדי לשייך אליו צמחים להשקיה אוטומטית.</div>';
@@ -1282,6 +1327,96 @@ function renderTuyaWeather(){
   if(wd) txt += (txt ? ' · ' : '') + 'דחיית השקיה בגשם: ' + tuyaDelayName(wd);
   w.textContent = txt;
   w.style.display = txt ? '' : 'none';
+}
+
+/* ================= מתזמן השקיה אוטומטי =================
+   הלוזים נשמרים ב-state (ומסונכרנים ל-Firebase) ונדחפים ל-Worker,
+   שה-cron שלו מפעיל את הבקר בזמן הנכון דרך Tuya. */
+let editingSchedId = null;
+function getSchedules(){ return state.schedules || []; }
+function schedZoneName(zoneIdx){
+  const z = (state.zones || []).find(z => z.tuyaZone === Number(zoneIdx));
+  return (z ? z.name + ' (' : '') + TUYA_ZONE_NAMES[Number(zoneIdx) - 1] + (z ? ')' : '');
+}
+function renderSchedules(){
+  const box = $('schedList');
+  if(!box) return;
+  const scheds = getSchedules();
+  if(!scheds.length){
+    box.innerHTML = '<p class="note">אין לוזים עדיין — הוסף לוז והשרת ישקה אוטומטית בזמן שהגדרת.</p>';
+    return;
+  }
+  const sorted = scheds.slice().sort((a, b) => (a.zone - b.zone) || String(a.time).localeCompare(String(b.time)));
+  box.innerHTML = sorted.map(s => {
+    const days = (s.days || []).slice().sort((a, b) => a - b).map(d => WEEKDAYS[d]).join(', ');
+    return '<div class="card" style="margin:6px 0;padding:10px"><div class="zone-head"><div>'
+      + '<div class="zone-name">' + esc(schedZoneName(s.zone)) + '</div>'
+      + '<div class="note">' + esc(days || 'לא נבחרו ימים') + ' · ' + esc(s.time || '06:00') + ' · ' + esc(String(s.durationMin)) + ' דקות'
+      + (s.enabled ? '' : ' · <b>כבוי</b>') + '</div>'
+      + '</div>'
+      + '<label class="switch"><input type="checkbox" data-sched-toggle="' + s.id + '"' + (s.enabled ? ' checked' : '') + '><span class="track"></span></label>'
+      + '</div><div class="btn-row">'
+      + '<button class="btn secondary" data-sched-edit="' + s.id + '">עריכה</button>'
+      + '<button class="btn danger" data-sched-del="' + s.id + '">מחיקה</button>'
+      + '</div></div>';
+  }).join('');
+  box.querySelectorAll('[data-sched-toggle]').forEach(t => t.addEventListener('change', () => {
+    const s = getSchedules().find(x => x.id === t.dataset.schedToggle);
+    if(s){ s.enabled = t.checked; save(); renderSchedules(); pushSchedulesToWorker(); }
+  }));
+  box.querySelectorAll('[data-sched-edit]').forEach(b => b.addEventListener('click', () => openSchedForm(b.dataset.schedEdit)));
+  box.querySelectorAll('[data-sched-del]').forEach(b => b.addEventListener('click', () => deleteSched(b.dataset.schedDel)));
+}
+function buildSchedDaysPicker(selected){
+  $('schedDays').innerHTML = WEEKDAYS.map((n, i) =>
+    '<label><input type="checkbox" value="' + i + '"' + (selected && selected.includes(i) ? ' checked' : '') + '>' + n + '</label>'
+  ).join('');
+}
+function openSchedForm(schedId){
+  editingSchedId = schedId || null;
+  const s = schedId ? getSchedules().find(x => x.id === schedId) : null;
+  $('schedFormTitle').textContent = s ? 'עריכת לוז' : 'לוז חדש';
+  document.querySelectorAll('input[name="schedZone"]').forEach(r => { r.checked = Number(r.value) === (s ? Number(s.zone) : 1); });
+  $('schedTime').value = s ? (s.time || '06:00') : '06:00';
+  $('schedDuration').value = s ? s.durationMin : 10;
+  document.querySelectorAll('input[name="schedActive"]').forEach(r => { r.checked = (r.value === 'yes') === (s ? !!s.enabled : true); });
+  buildSchedDaysPicker(s ? s.days : []);
+  $('schedFormCard').style.display = 'block';
+  $('schedFormCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function closeSchedForm(){ $('schedFormCard').style.display = 'none'; editingSchedId = null; }
+function saveSched(){
+  const zone = Number((document.querySelector('input[name="schedZone"]:checked') || {}).value || 1);
+  const days = Array.from($('schedDays').querySelectorAll('input:checked')).map(i => Number(i.value));
+  const time = $('schedTime').value || '06:00';
+  const durationMin = Math.max(1, Math.min(180, Number($('schedDuration').value) || 10));
+  const enabled = (document.querySelector('input[name="schedActive"]:checked') || {}).value === 'yes';
+  if(!days.length){ toast('בחר לפחות יום אחד'); return; }
+  if(editingSchedId){
+    const s = getSchedules().find(x => x.id === editingSchedId);
+    if(s) Object.assign(s, { zone, days, time, durationMin, enabled });
+  } else {
+    getSchedules().push({ id: uid(), zone, days, time, durationMin, enabled });
+  }
+  save(); closeSchedForm(); renderSchedules(); pushSchedulesToWorker();
+  toast('הלוז נשמר ונדחף לשרת');
+}
+function deleteSched(id){
+  if(!confirm('למחוק את הלוז?')) return;
+  state.schedules = getSchedules().filter(x => x.id !== id);
+  save(); renderSchedules(); pushSchedulesToWorker();
+  toast('הלוז נמחק');
+}
+/* דחיפת הלוזים ל-Worker (נדרש חיבור גוגל). נקרא אחרי כל שינוי ובטעינה. */
+async function pushSchedulesToWorker(){
+  const st = $('schedStatus');
+  try{
+    const r = await tuyaFetch('/api/schedules', { method: 'POST', body: JSON.stringify({ schedules: getSchedules() }) });
+    if(!r){ if(st) st.textContent = 'לא מחובר לגוגל — הלוזים נשמרו מקומית וידחפו בחיבור הבא.'; return; }
+    const j = await r.json();
+    if(j && j.success){ if(st) st.textContent = 'מסונכרן עם השרת · ' + j.count + ' לוזים פעילים · עדכון אחרון: ' + new Date().toLocaleTimeString('he-IL'); }
+    else if(st) st.textContent = 'שגיאה בדחיפה לשרת — נסה שוב.';
+  }catch(e){ if(st) st.textContent = 'שגיאת רשת בדחיפה לשרת.'; }
 }
 
 function buildDaysPicker(selected){
@@ -2063,6 +2198,9 @@ $('zoneCancel').addEventListener('click', closeZoneForm);
 $('zoneSave').addEventListener('click', saveZone);
 $('tuyaRefresh').addEventListener('click', refreshTuyaStatus);
 $('tuyaImport').addEventListener('click', importTuyaSettings);
+$('schedAddBtn').addEventListener('click', () => openSchedForm(null));
+$('schedCancel').addEventListener('click', closeSchedForm);
+$('schedSave').addEventListener('click', saveSched);
 $('tuyaSaveId').addEventListener('click', () => {
   state.tuyaDeviceId = ($('tuyaDeviceId').value || '').trim();
   save(); toast('מזהה הבקר נשמר');
