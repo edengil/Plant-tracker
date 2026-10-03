@@ -345,6 +345,9 @@ a{color:var(--green-dark)}
     <h2 class="section-title">בדיקת בריאות 📸 <span class="sub">צמחים שצריכים תמונה עדכנית</span></h2>
     <div id="healthCheckList"></div>
 
+    <h2 class="section-title">מעקב החלמה 🌱 <span class="sub">טיפולים שצריך לבדוק</span></h2>
+    <div id="recoveryList"></div>
+
     <h2 class="section-title">השקיה אוטומטית קרובה</h2>
     <div id="autoList"></div>
 
@@ -790,6 +793,27 @@ a{color:var(--green-dark)}
     </div>
     <div class="btn-row"><button class="btn" onclick="submitHealthAssessment()">קבל המלצות</button></div>
     <div id="healthAssessResult"></div>
+    <div id="healthTreatmentSection" style="display:none;margin-top:12px">
+      <div class="field">
+        <label>סמן טיפול שבוצע (יתוזמן מעקב אוטומטי)</label>
+        <select id="healthTreatmentType"></select>
+      </div>
+      <div class="btn-row"><button class="btn" onclick="submitHealthTreatment()">✅ ביצעתי — תזמן מעקב</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- מודל מעקב החלמה -->
+<div class="modal-backdrop" id="recoveryModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="recoveryTitle">מעקב החלמה</h3><button class="x-btn" onclick="closeModal('recoveryModal')">✕</button></div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <div style="flex:1"><div class="note">לפני הטיפול:</div><img id="recoveryBefore" style="width:100%;border-radius:10px"></div>
+      <div style="flex:1"><div class="note">עכשיו:</div><img id="recoveryAfterPreview" style="width:100%;border-radius:10px"></div>
+    </div>
+    <div class="field"><label>צלם תמונה עדכנית</label><input type="file" id="recoveryPhotoInput" accept="image/*" capture="environment"></div>
+    <div class="btn-row"><button class="btn" onclick="submitRecoveryPhoto()">העלה תמונה</button></div>
+    <div id="recoveryResult"></div>
   </div>
 </div>
 <input type="file" class="hidden-input" id="diagPhotoInput" accept="image/*">
@@ -1582,6 +1606,145 @@ function seedPlanters(){
 function getPlanter(id){ return (state.planters || []).find(p => p.id === id); }
 function planterPlants(planterId){ return state.plants.filter(p => p.planterId === planterId); }
 
+/* ================= מעקב החלמה חכם ================= */
+// זמני מעקב (ימים) לפי סוג טיפול — מבוסס מחקר הורטיקולטורי
+const TREATMENT_FOLLOWUP = {
+  iron_foliar:    { days: 10, label: 'ברזל בריסוס עלוותי' },
+  iron_soil:      { days: 21, label: 'ברזל בהגמעה לקרקע' },
+  overwater_mild: { days: 14, label: 'ייבוש אחרי השקיית יתר' },
+  overwater_severe:{ days: 28, label: 'טיפול בריקבון שורשים' },
+  underwater:     { days: 3,  label: 'השקיה אחרי יובש' },
+  pest_neem:      { days: 7,  label: 'טיפול נים נגד מזיקים' },
+  npk_liquid:     { days: 7,  label: 'דשן נוזלי' },
+  npk_slow:       { days: 21, label: 'דשן גרגירי איטי' },
+  transplant:     { days: 14, label: 'התאוששות משתילה' },
+  prune_soft:     { days: 7,  label: 'גיזום עשבים רכים' },
+  prune_woody:    { days: 21, label: 'גיזום עציים' },
+};
+
+function recordTreatment(plantId, type){
+  const p = state.plants.find(x => x.id === plantId);
+  const t = TREATMENT_FOLLOWUP[type];
+  if(!p || !t) return;
+  if(!Array.isArray(p.treatments)) p.treatments = [];
+  const now = new Date();
+  const followup = new Date(now.getTime() + t.days * 24 * 60 * 60 * 1000);
+  p.treatments.unshift({
+    id: uid(), type: type, label: t.label,
+    appliedAt: now.toISOString(),
+    followupAt: followup.toISOString(),
+    followupDays: t.days,
+    status: 'pending', // pending | improved | failed
+    beforePhoto: p.photo || null
+  });
+  if(!Array.isArray(p.history)) p.history = [];
+  p.history.unshift({ id: uid(), type: 'treatment', at: now.toISOString(), label: 'טיפול: ' + t.label + ' — מעקב בעוד ' + t.days + ' ימים' });
+  save(); renderAll();
+  toast('נרשם! תזכורת מעקב בעוד ' + t.days + ' ימים');
+}
+
+function treatmentsDue(){
+  const out = [];
+  const now = Date.now();
+  for(const p of state.plants){
+    for(const t of (p.treatments || [])){
+      if(t.status === 'pending' && new Date(t.followupAt).getTime() <= now){
+        out.push({ plant: p, treatment: t });
+      }
+    }
+  }
+  return out;
+}
+
+function renderRecoveryTracking(){
+  const box = $('recoveryList');
+  if(!box) return;
+  const due = treatmentsDue();
+  // גם טיפולים שמתקרבים (3 ימים לפני)
+  const upcoming = [];
+  const now = Date.now();
+  for(const p of state.plants){
+    for(const t of (p.treatments || [])){
+      if(t.status !== 'pending') continue;
+      const fut = new Date(t.followupAt).getTime();
+      if(fut > now && fut - now < 3 * 24 * 60 * 60 * 1000 && !due.some(d => d.treatment.id === t.id)){
+        upcoming.push({ plant: p, treatment: t, daysLeft: Math.ceil((fut - now) / (24*60*60*1000)) });
+      }
+    }
+  }
+  let html = '';
+  if(due.length === 0 && upcoming.length === 0){
+    box.innerHTML = '<p class="note">אין מעקבים ממתינים ✅</p>';
+    return;
+  }
+  for(const { plant: p, treatment: t } of due){
+    // בדיקת הסלמה: פי 2 מהזמן המומלץ
+    const appliedAt = new Date(t.appliedAt).getTime();
+    const overdue = (now - appliedAt) > (t.followupDays * 2 * 24 * 60 * 60 * 1000);
+    html += '<div class="card" style="margin:8px 0;padding:12px;border-right:4px solid ' + (overdue ? '#c0392b' : '#f39c12') + '">'
+      + '<div class="zone-name">' + esc(p.name) + ' — ' + esc(t.label) + '</div>'
+      + '<div class="note">טיפול בוצע: ' + fmtDate(t.appliedAt) + '</div>'
+      + (overdue ? '<div class="note" style="color:#c0392b;font-weight:700">⚠️ עבר פי 2 מהזמן המומלץ ללא שיפור — מומלץ להסלים (ייעוץ משתלה/אבחון מעמיק)</div>' : '<div class="note">הגיע זמן לבדוק אם השתפר!</div>')
+      + '<div style="display:flex;gap:8px;margin-top:8px">'
+      + (t.beforePhoto ? '<img src="' + t.beforePhoto + '" style="width:60px;height:60px;border-radius:8px;object-fit:cover" title="לפני">' : '')
+      + '<button class="btn" onclick="openRecoveryCheck(\'' + p.id + '\',\'' + t.id + '\')">בדוק עכשיו 📸</button>'
+      + '</div></div>';
+  }
+  for(const { plant: p, treatment: t, daysLeft } of upcoming){
+    html += '<div class="card" style="margin:8px 0;padding:10px;opacity:0.8">'
+      + '<div class="note">⏳ ' + esc(p.name) + ' — ' + esc(t.label) + ': מעקב בעוד ' + daysLeft + ' ימים</div></div>';
+  }
+  box.innerHTML = html;
+}
+
+let recoveryCheckCtx = null;
+function openRecoveryCheck(plantId, treatmentId){
+  const p = state.plants.find(x => x.id === plantId);
+  const t = p && (p.treatments || []).find(x => x.id === treatmentId);
+  if(!p || !t) return;
+  recoveryCheckCtx = { plantId, treatmentId };
+  $('recoveryTitle').textContent = 'מעקב: ' + p.name + ' — ' + t.label;
+  $('recoveryBefore').src = t.beforePhoto || plantImg(p);
+  $('recoveryAfterPreview').src = plantImg(p);
+  $('recoveryResult').innerHTML = '';
+  openModal('recoveryModal');
+}
+
+async function submitRecoveryPhoto(){
+  const file = $('recoveryPhotoInput').files[0];
+  if(!file){ toast('בחר תמונה עדכנית'); return; }
+  const { plantId } = recoveryCheckCtx || {};
+  const p = state.plants.find(x => x.id === plantId);
+  if(!p) return;
+  if(!Array.isArray(p.photoHistory)) p.photoHistory = [];
+  if(p.photo) p.photoHistory.unshift({ at: p.lastPhotoAt || new Date().toISOString(), photo: p.photo });
+  p.photo = await compressImageFile(file);
+  p.lastPhotoAt = new Date().toISOString();
+  save();
+  $('recoveryAfterPreview').src = p.photo;
+  $('recoveryResult').innerHTML = '<p class="note" style="margin-top:10px">השווה את התמונות — האם יש שיפור?</p>'
+    + '<div class="btn-row" style="margin-top:8px">'
+    + '<button class="btn" onclick="resolveRecovery(true)">✅ השתפר</button>'
+    + '<button class="btn secondary" onclick="resolveRecovery(false)">❌ לא השתפר</button>'
+    + '</div>';
+  renderAll();
+}
+
+function resolveRecovery(improved){
+  const { plantId, treatmentId } = recoveryCheckCtx || {};
+  const p = state.plants.find(x => x.id === plantId);
+  const t = p && (p.treatments || []).find(x => x.id === treatmentId);
+  if(!p || !t) return;
+  t.status = improved ? 'improved' : 'failed';
+  t.resolvedAt = new Date().toISOString();
+  if(!Array.isArray(p.history)) p.history = [];
+  p.history.unshift({ id: uid(), type: 'recovery', at: new Date().toISOString(),
+    label: 'מעקב ' + t.label + ': ' + (improved ? 'השתפר ✅' : 'לא השתפר ❌ — להסלים') });
+  save(); closeModal('recoveryModal'); renderAll();
+  if(improved) toast('מעולה! הטיפול עבד 🌱');
+  else toast('לא השתפר — שקול ייעוץ או טיפול חלופי');
+}
+
 /* ================= בדיקת בריאות ================= */
 function plantsNeedingPhoto(){
   const out = [];
@@ -1641,10 +1804,23 @@ async function submitHealthPhoto(){
 function openHealthAssessment(plantId){
   const p = state.plants.find(x => x.id === plantId);
   if(!p) return;
+  $('healthAssessModal').dataset.plantId = plantId;
   $('healthAssessTitle').textContent = 'הערכת מצב: ' + p.name;
   $('healthAssessImg').src = plantImg(p);
   $('healthAssessResult').innerHTML = '';
+  $('healthTreatmentSection').style.display = 'none';
+  // מילוי סוגי טיפול
+  $('healthTreatmentType').innerHTML = Object.entries(TREATMENT_FOLLOWUP)
+    .map(([k, v]) => '<option value="' + k + '">' + esc(v.label) + ' — מעקב בעוד ' + v.days + ' ימים</option>').join('');
   openModal('healthAssessModal');
+}
+
+function submitHealthTreatment(){
+  const plantId = $('healthAssessModal').dataset.plantId;
+  const type = $('healthTreatmentType').value;
+  if(!plantId || !type){ toast('בחר טיפול'); return; }
+  closeModal('healthAssessModal');
+  recordTreatment(plantId, type);
 }
 
 function submitHealthAssessment(){
@@ -1663,6 +1839,7 @@ function submitHealthAssessment(){
   $('healthAssessResult').innerHTML = '<div class="card" style="margin-top:10px;padding:12px;background:#f0f7f0">'
     + '<div class="zone-name">המלצות:</div>'
     + '<ul style="margin:8px 0;padding-right:20px">' + suggestions.map(s => '<li class="note">' + esc(s) + '</li>').join('') + '</ul></div>';
+  $('healthTreatmentSection').style.display = '';
   // שמירה בהיסטוריה
   if(p){
     if(!Array.isArray(p.history)) p.history = [];
@@ -1803,7 +1980,7 @@ function renderSettings(){
 }
 
 /* ================= רינדור כללי ================= */
-function renderAll(){ renderHome(); renderPlants(); renderPlanters(); renderIrrigation(); renderFertilizers(); renderHealthCheck(); renderSettings(); }
+function renderAll(){ renderHome(); renderPlants(); renderPlanters(); renderIrrigation(); renderFertilizers(); renderHealthCheck(); renderRecoveryTracking(); renderSettings(); }
 
 /* ================= טיפול בצמחים ================= */
 function markCare(plantId, type){
