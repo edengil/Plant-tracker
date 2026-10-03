@@ -1057,8 +1057,19 @@ function renderHome(){
   });
   autos.sort((a,b) => (a.nxt ? a.nxt.getTime() : Infinity) - (b.nxt ? b.nxt.getTime() : Infinity));
   const al = $('autoList');
-  if(autos.length === 0){
+  const activeZones = state.zones.filter(z => z.active);
+  if(autos.length === 0 && activeZones.length === 0){
     al.innerHTML = '<div class="empty">' + EMPTY_ART + 'אין צמחים בהשקיה אוטומטית עדיין.<br>שייך צמח לאזור במסך ההשקיה ותראה כאן את ההשקיה הבאה שלו.</div>';
+  } else if(autos.length === 0){
+    // יש אזורי השקיה אבל עוד לא שויך אליהם אף צמח — מציגים את האזורים וההשקיה הבאה שלהם
+    const items = activeZones.map(z => ({ z, nxt: nextZoneRun(z) }));
+    items.sort((a,b) => (a.nxt ? a.nxt.getTime() : Infinity) - (b.nxt ? b.nxt.getTime() : Infinity));
+    al.innerHTML = items.map(a => {
+      const when = a.nxt ? fmtDateTime(a.nxt) : 'לא מתוזמן — הגדר ימים במסך ההשקיה';
+      return '<div class="task-card"><div class="t-photo" style="display:flex;align-items:center;justify-content:center;font-size:30px;background:var(--bg)">💧</div>'
+        + '<div class="t-main"><div class="t-name">' + esc(a.z.name) + (a.z.tuyaZone ? ' 🔗' : '') + '</div>'
+        + '<div class="t-sub">השקיה הבאה: ' + esc(when) + ' · ' + esc(String(a.z.durationMin)) + ' דק׳</div></div></div>';
+    }).join('');
   } else {
     al.innerHTML = autos.map(a => {
       const when = a.nxt ? fmtDateTime(a.nxt) + ' · ' + a.z.durationMin + ' דק׳' : 'האזור אינו פעיל';
