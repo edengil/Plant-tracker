@@ -824,15 +824,47 @@ a{color:var(--green-dark)}
 <div class="modal-backdrop" id="recoveryModal">
   <div class="modal">
     <div class="modal-head"><h3 id="recoveryTitle">מעקב החלמה</h3><button class="x-btn" onclick="closeModal('recoveryModal')">✕</button></div>
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <div style="flex:1"><div class="note">לפני הטיפול:</div><img id="recoveryBefore" style="width:100%;border-radius:10px"></div>
-      <div style="flex:1"><div class="note">עכשיו:</div><img id="recoveryAfterPreview" style="width:100%;border-radius:10px"></div>
+    <div class="note" style="margin-bottom:8px">גרור את הסליידר להשוואת לפני/אחרי:</div>
+    <div id="recoverySlider" style="position:relative;width:100%;height:250px;border-radius:10px;overflow:hidden;touch-action:none;user-select:none">
+      <img id="recoveryAfter" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
+      <div id="recoveryBeforeWrap" style="position:absolute;inset:0;width:50%;overflow:hidden">
+        <img id="recoveryBefore" style="position:absolute;top:0;right:0;height:100%;width:100vw;max-width:none;object-fit:cover;object-position:right center">
+      </div>
+      <div id="recoveryHandle" style="position:absolute;top:0;bottom:0;left:50%;width:3px;background:#fff;box-shadow:0 0 8px rgba(0,0,0,.5);cursor:ew-resize">
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,.3)">↔</div>
+      </div>
+      <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);color:#fff;padding:2px 8px;border-radius:10px;font-size:12px">לפני</div>
+      <div style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,.6);color:#fff;padding:2px 8px;border-radius:10px;font-size:12px">אחרי</div>
     </div>
-    <div class="field"><label>צלם תמונה עדכנית</label><input type="file" id="recoveryPhotoInput" accept="image/*" capture="environment"></div>
+    <div class="field" style="margin-top:12px"><label>צלם תמונה עדכנית</label><input type="file" id="recoveryPhotoInput" accept="image/*" capture="environment"></div>
     <div class="btn-row"><button class="btn" onclick="submitRecoveryPhoto()">העלה תמונה</button></div>
     <div id="recoveryResult"></div>
   </div>
 </div>
+
+<script>
+// לוגיקת סליידר השוואה — גרירה
+(function(){
+  const slider = document.getElementById('recoverySlider');
+  if(!slider) return;
+  const wrap = document.getElementById('recoveryBeforeWrap');
+  const handle = document.getElementById('recoveryHandle');
+  let dragging = false;
+  function setPos(clientX){
+    const r = slider.getBoundingClientRect();
+    let pct = ((clientX - r.left) / r.width) * 100;
+    pct = Math.max(5, Math.min(95, pct));
+    // RTL: "לפני" מימין, אז הופכים
+    const rtlPct = 100 - pct;
+    wrap.style.width = rtlPct + '%';
+    handle.style.left = pct + '%';
+  }
+  slider.addEventListener('pointerdown', e => { dragging = true; slider.setPointerCapture(e.pointerId); setPos(e.clientX); });
+  slider.addEventListener('pointermove', e => { if(dragging) setPos(e.clientX); });
+  slider.addEventListener('pointerup', () => dragging = false);
+  slider.addEventListener('pointercancel', () => dragging = false);
+})();
+</script>
 <input type="file" class="hidden-input" id="diagPhotoInput" accept="image/*">
 
 <!-- ================= COMPARE MODAL ================= -->
@@ -1794,8 +1826,13 @@ function openRecoveryCheck(plantId, treatmentId){
   if(!p || !t) return;
   recoveryCheckCtx = { plantId, treatmentId };
   $('recoveryTitle').textContent = 'מעקב: ' + p.name + ' — ' + t.label;
-  $('recoveryBefore').src = t.beforePhoto || plantImg(p);
-  $('recoveryAfterPreview').src = plantImg(p);
+  const beforeSrc = t.beforePhoto || plantImg(p);
+  const afterSrc = plantImg(p);
+  $('recoveryBefore').src = beforeSrc;
+  $('recoveryAfter').src = afterSrc;
+  // איפוס הסליידר לאמצע
+  $('recoveryBeforeWrap').style.width = '50%';
+  $('recoveryHandle').style.left = '50%';
   $('recoveryResult').innerHTML = '';
   openModal('recoveryModal');
 }
@@ -1811,7 +1848,7 @@ async function submitRecoveryPhoto(){
   p.photo = await compressImageFile(file);
   p.lastPhotoAt = new Date().toISOString();
   save();
-  $('recoveryAfterPreview').src = p.photo;
+  $('recoveryAfter').src = p.photo;
   $('recoveryResult').innerHTML = '<p class="note" style="margin-top:10px">השווה את התמונות — האם יש שיפור?</p>'
     + '<div class="btn-row" style="margin-top:8px">'
     + '<button class="btn" onclick="resolveRecovery(true)">✅ השתפר</button>'
@@ -2369,6 +2406,35 @@ function openDetail(plantId){
         return '<div class="history-item"><span>' + chip + '</span><span class="note">' + new Intl.DateTimeFormat('he-IL',{day:'numeric',month:'numeric',year:'numeric'}).format(d) + extra + '</span></div>';
       }).join('');
   renderJournal(p);
+  // היסטוריית טיפולים — ציר זמן
+  const treatments = Array.isArray(p.treatments) ? p.treatments : [];
+  let treatHTML = '';
+  if(treatments.length === 0){
+    treatHTML = '<p class="note">עדיין לא נרשמו טיפולים.</p>';
+  } else {
+    treatHTML = treatments.map(t => {
+      const statusChip = t.status === 'improved' ? '<span class="chip auto">✅ השתפר</span>'
+        : t.status === 'failed' ? '<span class="chip" style="background:#c0392b;color:#fff">❌ לא השתפר</span>'
+        : '<span class="chip due">⏳ במעקב</span>';
+      const doneTasks = (t.tasks || []).filter(x => x.done).length;
+      const totalTasks = (t.tasks || []).length;
+      return '<div class="card" style="margin:6px 0;padding:10px">'
+        + '<div style="display:flex;align-items:center;gap:8px">'
+        + '<div class="note" style="flex:1"><b>' + esc(t.label) + '</b><br>' + fmtDate(t.appliedAt)
+        + (totalTasks ? ' · ' + doneTasks + '/' + totalTasks + ' משימות' : '') + '</div>'
+        + statusChip + '</div>'
+        + (t.beforePhoto ? '<img src="' + t.beforePhoto + '" style="width:50px;height:50px;border-radius:8px;object-fit:cover;margin-top:6px" title="לפני הטיפול">' : '')
+        + '</div>';
+    }).join('');
+  }
+  let treatSection = $('d_treatments');
+  if(!treatSection){
+    treatSection = document.createElement('div');
+    treatSection.id = 'd_treatments';
+    const histEl = $('d_history');
+    histEl.parentElement.insertBefore(treatSection, histEl.nextSibling);
+  }
+  treatSection.innerHTML = '<h4 style="margin:12px 0 6px">היסטוריית טיפולים 🌱</h4>' + treatHTML;
   openModal('detailModal');
 }
 
