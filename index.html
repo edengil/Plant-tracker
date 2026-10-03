@@ -376,6 +376,7 @@ a{color:var(--green-dark)}
         <button class="btn secondary" id="tuyaSaveId">שמור מזהה</button>
       </div>
       <p class="note" id="tuyaStatus">לא נטען עדיין — התחבר עם גוגל בהגדרות ואז לחץ "רענן סטטוס".</p>
+      <p class="note" id="tuyaWeather" style="display:none;margin-top:6px"></p>
       <div id="tuyaZones"></div>
     </div>
     <div class="card">
@@ -1132,6 +1133,14 @@ function renderIrrigation(){
 const TUYA_PROXY = 'https://plant-tracker-tuya.edengil94.workers.dev';
 const TUYA_ZONE_NAMES = ['אזור A', 'אזור B', 'אזור C'];
 let tuyaState = null;
+let tuyaCmdBusy = false; // מונע פקודות כפולות כשלוחצים מהר
+
+/* סנכרון בין לשוניות/חלונות: שינוי בלשונית אחת מתעדכן אוטומטית באחרות */
+window.addEventListener('storage', (e) => {
+  if(e.key === LS_KEY && e.newValue){
+    try{ state = JSON.parse(e.newValue); renderAll(); }catch(err){}
+  }
+});
 async function tuyaHeaders(force){
   if(!fbUser) return null;
   try{ return { 'Authorization': 'Bearer ' + await fbUser.getIdToken(!!force), 'Content-Type': 'application/json' }; }
@@ -1172,19 +1181,26 @@ async function refreshTuyaStatus(){
 function renderTuyaZones(){
   const box = $('tuyaZones');
   if(!box) return;
+  renderTuyaWeather();
   if(!tuyaState){ box.innerHTML = ''; return; }
   box.innerHTML = [1,2,3].map(i => {
     const on = !!tuyaState['switch_' + i];
     const cd = tuyaState['countdown_' + i];
     return '<div class="zone-head" style="margin-top:10px"><div>'
       + '<div class="zone-name">' + TUYA_ZONE_NAMES[i-1] + '</div>'
-      + '<div class="note">' + (on ? 'פועל עכשיו 💧' : 'כבוי') + (cd ? ' · טיימר: ' + cd + ' שנ׳' : '') + '</div>'
+      + '<div class="note">' + (on ? 'פועל עכשיו 💧' : 'כבוי') + (cd ? ' · טיימר: ' + fmtCountdown(cd) : '') + '</div>'
       + '</div>'
       + '<label class="switch"><input type="checkbox" data-tuya-zone="' + i + '"' + (on ? ' checked' : '') + '><span class="track"></span></label>'
       + '</div>';
   }).join('');
-  box.querySelectorAll('[data-tuya-zone]').forEach(t => t.addEventListener('change', () => {
-    toggleTuyaZone(Number(t.dataset.tuyaZone), t.checked);
+  box.querySelectorAll('[data-tuya-zone]').forEach(t => t.addEventListener('click', (e) => {
+    e.preventDefault(); // המתג לא מתהפך מעצמו — רק אחרי אישור מפורש
+    if(tuyaCmdBusy) return;
+    const i = Number(t.dataset.tuyaZone);
+    const targetOn = !t.checked;
+    if(!confirm((targetOn ? 'להפעיל את ' : 'לכבות את ') + TUYA_ZONE_NAMES[i-1] + '?')) return;
+    t.checked = targetOn;
+    toggleTuyaZone(i, targetOn);
   }));
 }
 /* ייבוא הגדרות מהבקר: קורא את טיימרי האזורים ויוצר/מעדכן אזורי השקיה באפליקציה.
@@ -1213,21 +1229,48 @@ async function importTuyaSettings(){
   }catch(e){ toast('שגיאת רשת — נסה שוב'); }
 }
 async function toggleTuyaZone(i, on){
-  const name = TUYA_ZONE_NAMES[i-1];
-  if(!confirm((on ? 'להפעיל את ' : 'לכבות את ') + name + '?')){ renderTuyaZones(); return; }
-  const id = tuyaDeviceId();
-  if(!id){ renderTuyaZones(); return; }
+  if(tuyaCmdBusy){ renderTuyaZones(); return; }
+  tuyaCmdBusy = true;
   try{
+    const id = tuyaDeviceId();
+    if(!id){ renderTuyaZones(); return; }
     const r = await tuyaFetch('/api/control/' + encodeURIComponent(id), {
       method: 'POST',
       body: JSON.stringify({ code: 'switch_' + i, value: on })
     });
     if(!r){ renderTuyaZones(); return; }
     const j = await r.json();
-    if(j && j.success){ toast(name + (on ? ' הופעל 💧' : ' כובה')); }
+    if(j && j.success){ toast(TUYA_ZONE_NAMES[i-1] + (on ? ' הופעל 💧' : ' כובה')); }
     else { toast('הפקודה נכשלה — נסה שוב'); }
   }catch(e){ toast('שגיאת רשת'); }
+  tuyaCmdBusy = false;
   refreshTuyaStatus();
+}
+/* שמות ידידותיים לנתוני מזג האוויר מהבקר */
+function tuyaWeatherName(v){
+  const m = { sunny: 'שמשי ☀️', cloudy: 'מעונן ☁️', rainy: 'גשום 🌧️' };
+  return m[String(v || '').toLowerCase()] || String(v || '');
+}
+function tuyaDelayName(v){
+  const m = { cancel: 'מבוטלת', delay: 'פעילה', running: 'פעילה' };
+  return m[String(v || '').toLowerCase()] || String(v || '');
+}
+function fmtCountdown(s){
+  s = Number(s);
+  if(!s) return '';
+  if(s >= 60) return Math.round(s / 60) + ' דקות';
+  return s + ' שנ׳';
+}
+function renderTuyaWeather(){
+  const w = $('tuyaWeather');
+  if(!w) return;
+  if(!tuyaState){ w.textContent = ''; w.style.display = 'none'; return; }
+  const sw = tuyaState['smart_weather'], wd = tuyaState['weather_delay'];
+  let txt = '';
+  if(sw) txt += 'מזג אוויר חכם: ' + tuyaWeatherName(sw);
+  if(wd) txt += (txt ? ' · ' : '') + 'דחיית השקיה בגשם: ' + tuyaDelayName(wd);
+  w.textContent = txt;
+  w.style.display = txt ? '' : 'none';
 }
 
 function buildDaysPicker(selected){
