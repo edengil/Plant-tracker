@@ -348,6 +348,7 @@ a{color:var(--green-dark)}
     <h2 class="section-title">מעקב החלמה 🌱 <span class="sub">טיפולים שצריך לבדוק</span></h2>
     <div id="recoveryList"></div>
 
+    <div id="taskOverdueAlert"></div>
     <h2 class="section-title">משימות טיפול ☑️ <span class="sub">צ׳קליסט לפי צמח</span></h2>
     <div id="treatmentTasksList"></div>
 
@@ -1638,19 +1639,19 @@ const TREATMENT_FOLLOWUP = {
   prune_woody:    { days: 21, label: 'גיזום עציים' },
 };
 
-// משימות מפורטות לכל סוג טיפול — צ׳קליסט לביצוע
+// משימות מפורטות לכל סוג טיפול — צ׳קליסט עם יעדי זמן (ימים מהטיפול)
 const TREATMENT_TASKS = {
-  iron_foliar:    ['ריסוס עלוותי ב-KF MICRO', 'בדיקת מעקב — צילום בעוד 10 ימים'],
-  iron_soil:      ['הגמעת KF MICRO לקרקע', 'פיזור גופרית סביב הצמח', 'בדיקת מעקב — צילום בעוד 21 ימים'],
-  overwater_mild: ['הפסקת השקיה — לתת לאדמה להתייבש', 'בדיקת מעקב בעוד 14 ימים'],
-  overwater_severe:['הוצאת הצמח, גיזום שורשים רקובים', 'שתילה מחדש בתערובת יבשה', 'ללא השקיה 5-7 ימים', 'בדיקת מעקב בעוד 28 ימים'],
-  underwater:     ['השקיה יסודית עד נגירה', 'בדיקת מעקב בעוד 3 ימים'],
-  pest_neem:      ['ריסוס ראשון ב-KF Guard', 'ריסוס שני בעוד 5-7 ימים', 'בדיקת מעקב בעוד 7 ימים'],
-  npk_liquid:     ['דישון ב-KF G&B דרך ההשקיה', 'בדיקת מעקב בעוד 7 ימים'],
-  npk_slow:       ['פיזור דשן גרגירי', 'השקיה להטמעה', 'בדיקת מעקב בעוד 21 ימים'],
-  transplant:     ['השקיה קלה לייצוב', 'KF-10 להקלת שוק', 'בדיקת מעקב בעוד 14 ימים'],
-  prune_soft:     ['גיזום', 'KF-10 לעידוד צמיחה', 'בדיקת מעקב בעוד 7 ימים'],
-  prune_woody:    ['גיזום זהיר (לא לעץ חום!)', 'KF-10 לעידוד צמיחה', 'בדיקת מעקב בעוד 21 ימים'],
+  iron_foliar:    [{t:'ריסוס עלוותי ב-KF MICRO',d:0}, {t:'בדיקת מעקב — צילום',d:10}],
+  iron_soil:      [{t:'הגמעת KF MICRO לקרקע',d:0}, {t:'פיזור גופרית סביב הצמח',d:0}, {t:'בדיקת מעקב — צילום',d:21}],
+  overwater_mild: [{t:'הפסקת השקיה — לתת לאדמה להתייבש',d:0}, {t:'בדיקת מעקב',d:14}],
+  overwater_severe:[{t:'הוצאת הצמח, גיזום שורשים רקובים',d:0}, {t:'שתילה מחדש בתערובת יבשה',d:0}, {t:'ללא השקיה 5-7 ימים',d:6}, {t:'בדיקת מעקב',d:28}],
+  underwater:     [{t:'השקיה יסודית עד נגירה',d:0}, {t:'בדיקת מעקב',d:3}],
+  pest_neem:      [{t:'ריסוס ראשון ב-KF Guard',d:0}, {t:'ריסוס שני',d:6}, {t:'בדיקת מעקב',d:7}],
+  npk_liquid:     [{t:'דישון ב-KF G&B דרך ההשקיה',d:0}, {t:'בדיקת מעקב',d:7}],
+  npk_slow:       [{t:'פיזור דשן גרגירי',d:0}, {t:'השקיה להטמעה',d:0}, {t:'בדיקת מעקב',d:21}],
+  transplant:     [{t:'השקיה קלה לייצוב',d:0}, {t:'KF-10 להקלת שוק',d:0}, {t:'בדיקת מעקב',d:14}],
+  prune_soft:     [{t:'גיזום',d:0}, {t:'KF-10 לעידוד צמיחה',d:0}, {t:'בדיקת מעקב',d:7}],
+  prune_woody:    [{t:'גיזום זהיר (לא לעץ חום!)',d:0}, {t:'KF-10 לעידוד צמיחה',d:0}, {t:'בדיקת מעקב',d:21}],
 };
 
 function recordTreatment(plantId, type){
@@ -1660,9 +1661,11 @@ function recordTreatment(plantId, type){
   if(!Array.isArray(p.treatments)) p.treatments = [];
   const now = new Date();
   const followup = new Date(now.getTime() + t.days * 24 * 60 * 60 * 1000);
-  const taskLabels = TREATMENT_TASKS[type] || ['ביצוע טיפול', 'בדיקת מעקב'];
-  const tasks = taskLabels.map((label, i) => ({
-    id: uid(), label: label, done: i === 0, // המשימה הראשונה מסומנת כבוצעת (הטיפול עצמו)
+  const taskDefs = TREATMENT_TASKS[type] || [{t:'ביצוע טיפול',d:0}, {t:'בדיקת מעקב',d:7}];
+  const tasks = taskDefs.map((def, i) => ({
+    id: uid(), label: def.t, dueInDays: def.d,
+    dueAt: new Date(now.getTime() + def.d * 24 * 60 * 60 * 1000).toISOString(),
+    done: i === 0, // המשימה הראשונה מסומנת כבוצעת (הטיפול עצמו)
     doneAt: i === 0 ? now.toISOString() : null
   }));
   p.treatments.unshift({
@@ -1693,23 +1696,39 @@ function toggleTreatmentTask(plantId, treatmentId, taskId){
 function renderTreatmentTasks(){
   const box = $('treatmentTasksList');
   if(!box) return;
+  const now = Date.now();
   let html = '';
+  let overdueCount = 0;
   for(const p of state.plants){
     const active = (p.treatments || []).filter(t => t.status === 'pending' && t.tasks && t.tasks.some(task => !task.done));
     for(const t of active){
-      html += '<div class="card" style="margin:8px 0;padding:12px">'
+      const overdueTasks = t.tasks.filter(task => !task.done && task.dueAt && new Date(task.dueAt).getTime() < now);
+      overdueCount += overdueTasks.length;
+      const hasOverdue = overdueTasks.length > 0;
+      html += '<div class="card" style="margin:8px 0;padding:12px' + (hasOverdue ? ';border-right:4px solid #c0392b' : '') + '">'
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
         + '<img src="' + plantImg(p) + '" style="width:40px;height:40px;border-radius:8px;object-fit:cover">'
         + '<div class="zone-name" style="flex:1;font-size:14px">' + esc(p.name) + ' — ' + esc(t.label) + '</div>'
+        + (hasOverdue ? '<span class="chip" style="background:#c0392b;color:#fff">🔴 ' + overdueTasks.length + ' באיחור</span>' : '')
         + '</div>';
       for(const task of t.tasks){
+        const isOverdue = !task.done && task.dueAt && new Date(task.dueAt).getTime() < now;
+        const dueNote = task.dueAt && !task.done ? ' <span class="note" style="font-size:11px;color:' + (isOverdue ? '#c0392b;font-weight:700' : '#888') + '">(' + (isOverdue ? 'באיחור! ' : '') + 'יעד: ' + fmtDate(task.dueAt) + ')</span>' : '';
         html += '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer">'
           + '<input type="checkbox" ' + (task.done ? 'checked' : '') + ' onchange="toggleTreatmentTask(\'' + p.id + '\',\'' + t.id + '\',\'' + task.id + '\')" style="width:18px;height:18px">'
-          + '<span class="note" style="' + (task.done ? 'text-decoration:line-through;opacity:0.6' : '') + '">' + esc(task.label) + '</span>'
+          + '<span class="note" style="' + (task.done ? 'text-decoration:line-through;opacity:0.6' : (isOverdue ? 'font-weight:700;color:#c0392b' : '')) + '">' + esc(task.label) + '</span>'
+          + dueNote
           + '</label>';
       }
       html += '</div>';
     }
+  }
+  // התראה בראש הדף אם יש משימות באיחור
+  const alertBox = $('taskOverdueAlert');
+  if(alertBox){
+    alertBox.innerHTML = overdueCount > 0
+      ? '<div class="card" style="margin:8px 0;padding:12px;background:#fdecea;border-right:4px solid #c0392b"><b>🔴 ' + overdueCount + ' משימות טיפול באיחור!</b><div class="note">גלול למטה לצ׳קליסט המשימות</div></div>'
+      : '';
   }
   box.innerHTML = html || '<p class="note">אין משימות טיפול פעילות ✅</p>';
 }
