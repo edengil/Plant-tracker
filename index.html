@@ -348,6 +348,9 @@ a{color:var(--green-dark)}
     <h2 class="section-title">מעקב החלמה 🌱 <span class="sub">טיפולים שצריך לבדוק</span></h2>
     <div id="recoveryList"></div>
 
+    <h2 class="section-title">משימות טיפול ☑️ <span class="sub">צ׳קליסט לפי צמח</span></h2>
+    <div id="treatmentTasksList"></div>
+
     <h2 class="section-title">השקיה אוטומטית קרובה</h2>
     <div id="autoList"></div>
 
@@ -800,6 +803,19 @@ a{color:var(--green-dark)}
       </div>
       <div class="btn-row"><button class="btn" onclick="submitHealthTreatment()">✅ ביצעתי — תזמן מעקב</button></div>
     </div>
+  </div>
+</div>
+
+<!-- מודל הוספת חומר חדש -->
+<div class="modal-backdrop" id="addFertModal">
+  <div class="modal">
+    <div class="modal-head"><h3>קניתי חומר חדש 🛒</h3><button class="x-btn" onclick="closeModal('addFertModal')">✕</button></div>
+    <div class="field"><label>שם החומר *</label><input type="text" id="cf_name" placeholder="למשל: ברזל נוזלי"></div>
+    <div class="field"><label>סוג</label><input type="text" id="cf_type" placeholder="למשל: דשן ברזל"></div>
+    <div class="field"><label>תיאור</label><textarea id="cf_desc" rows="2"></textarea></div>
+    <div class="field"><label>מינון</label><input type="text" id="cf_dosage" placeholder="למשל: 5 מ״ל לליטר"></div>
+    <div class="field"><label>כמות</label><input type="text" id="cf_qty" placeholder="למשל: 500 מ״ל"></div>
+    <div class="btn-row"><button class="btn" onclick="addCustomFert()">הוסף למלאי</button></div>
   </div>
 </div>
 
@@ -1622,6 +1638,21 @@ const TREATMENT_FOLLOWUP = {
   prune_woody:    { days: 21, label: 'גיזום עציים' },
 };
 
+// משימות מפורטות לכל סוג טיפול — צ׳קליסט לביצוע
+const TREATMENT_TASKS = {
+  iron_foliar:    ['ריסוס עלוותי ב-KF MICRO', 'בדיקת מעקב — צילום בעוד 10 ימים'],
+  iron_soil:      ['הגמעת KF MICRO לקרקע', 'פיזור גופרית סביב הצמח', 'בדיקת מעקב — צילום בעוד 21 ימים'],
+  overwater_mild: ['הפסקת השקיה — לתת לאדמה להתייבש', 'בדיקת מעקב בעוד 14 ימים'],
+  overwater_severe:['הוצאת הצמח, גיזום שורשים רקובים', 'שתילה מחדש בתערובת יבשה', 'ללא השקיה 5-7 ימים', 'בדיקת מעקב בעוד 28 ימים'],
+  underwater:     ['השקיה יסודית עד נגירה', 'בדיקת מעקב בעוד 3 ימים'],
+  pest_neem:      ['ריסוס ראשון ב-KF Guard', 'ריסוס שני בעוד 5-7 ימים', 'בדיקת מעקב בעוד 7 ימים'],
+  npk_liquid:     ['דישון ב-KF G&B דרך ההשקיה', 'בדיקת מעקב בעוד 7 ימים'],
+  npk_slow:       ['פיזור דשן גרגירי', 'השקיה להטמעה', 'בדיקת מעקב בעוד 21 ימים'],
+  transplant:     ['השקיה קלה לייצוב', 'KF-10 להקלת שוק', 'בדיקת מעקב בעוד 14 ימים'],
+  prune_soft:     ['גיזום', 'KF-10 לעידוד צמיחה', 'בדיקת מעקב בעוד 7 ימים'],
+  prune_woody:    ['גיזום זהיר (לא לעץ חום!)', 'KF-10 לעידוד צמיחה', 'בדיקת מעקב בעוד 21 ימים'],
+};
+
 function recordTreatment(plantId, type){
   const p = state.plants.find(x => x.id === plantId);
   const t = TREATMENT_FOLLOWUP[type];
@@ -1629,18 +1660,58 @@ function recordTreatment(plantId, type){
   if(!Array.isArray(p.treatments)) p.treatments = [];
   const now = new Date();
   const followup = new Date(now.getTime() + t.days * 24 * 60 * 60 * 1000);
+  const taskLabels = TREATMENT_TASKS[type] || ['ביצוע טיפול', 'בדיקת מעקב'];
+  const tasks = taskLabels.map((label, i) => ({
+    id: uid(), label: label, done: i === 0, // המשימה הראשונה מסומנת כבוצעת (הטיפול עצמו)
+    doneAt: i === 0 ? now.toISOString() : null
+  }));
   p.treatments.unshift({
     id: uid(), type: type, label: t.label,
     appliedAt: now.toISOString(),
     followupAt: followup.toISOString(),
     followupDays: t.days,
-    status: 'pending', // pending | improved | failed
-    beforePhoto: p.photo || null
+    status: 'pending',
+    beforePhoto: p.photo || null,
+    tasks: tasks
   });
   if(!Array.isArray(p.history)) p.history = [];
   p.history.unshift({ id: uid(), type: 'treatment', at: now.toISOString(), label: 'טיפול: ' + t.label + ' — מעקב בעוד ' + t.days + ' ימים' });
   save(); renderAll();
-  toast('נרשם! תזכורת מעקב בעוד ' + t.days + ' ימים');
+  toast('נרשם! צ׳קליסט משימות נוסף לדף הראשי');
+}
+
+function toggleTreatmentTask(plantId, treatmentId, taskId){
+  const p = state.plants.find(x => x.id === plantId);
+  const t = p && (p.treatments || []).find(x => x.id === treatmentId);
+  const task = t && t.tasks.find(x => x.id === taskId);
+  if(!task) return;
+  task.done = !task.done;
+  task.doneAt = task.done ? new Date().toISOString() : null;
+  save(); renderAll();
+}
+
+function renderTreatmentTasks(){
+  const box = $('treatmentTasksList');
+  if(!box) return;
+  let html = '';
+  for(const p of state.plants){
+    const active = (p.treatments || []).filter(t => t.status === 'pending' && t.tasks && t.tasks.some(task => !task.done));
+    for(const t of active){
+      html += '<div class="card" style="margin:8px 0;padding:12px">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+        + '<img src="' + plantImg(p) + '" style="width:40px;height:40px;border-radius:8px;object-fit:cover">'
+        + '<div class="zone-name" style="flex:1;font-size:14px">' + esc(p.name) + ' — ' + esc(t.label) + '</div>'
+        + '</div>';
+      for(const task of t.tasks){
+        html += '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer">'
+          + '<input type="checkbox" ' + (task.done ? 'checked' : '') + ' onchange="toggleTreatmentTask(\'' + p.id + '\',\'' + t.id + '\',\'' + task.id + '\')" style="width:18px;height:18px">'
+          + '<span class="note" style="' + (task.done ? 'text-decoration:line-through;opacity:0.6' : '') + '">' + esc(task.label) + '</span>'
+          + '</label>';
+      }
+      html += '</div>';
+    }
+  }
+  box.innerHTML = html || '<p class="note">אין משימות טיפול פעילות ✅</p>';
 }
 
 function treatmentsDue(){
@@ -1809,10 +1880,35 @@ function openHealthAssessment(plantId){
   $('healthAssessImg').src = plantImg(p);
   $('healthAssessResult').innerHTML = '';
   $('healthTreatmentSection').style.display = 'none';
-  // מילוי סוגי טיפול
+  // מילוי סוגי טיפול עם בדיקת מלאי
   $('healthTreatmentType').innerHTML = Object.entries(TREATMENT_FOLLOWUP)
-    .map(([k, v]) => '<option value="' + k + '">' + esc(v.label) + ' — מעקב בעוד ' + v.days + ' ימים</option>').join('');
+    .map(([k, v]) => {
+      const { available, missing } = checkMaterials(k);
+      const stockNote = missing.length > 0 ? ' ⚠️ חסר: ' + missing.join(', ') + ' — מומלץ לקנות!' : ' ✅ הכל במלאי';
+      return '<option value="' + k + '">' + esc(v.label) + ' (' + v.days + ' ימים)' + stockNote + '</option>';
+    }).join('');
+  $('healthTreatmentType').onchange = updateTreatmentStockWarning;
+  updateTreatmentStockWarning();
   openModal('healthAssessModal');
+}
+
+function updateTreatmentStockWarning(){
+  const type = $('healthTreatmentType').value;
+  const { available, missing } = checkMaterials(type);
+  let el = $('treatmentStockWarn');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'treatmentStockWarn';
+    $('healthTreatmentType').parentElement.appendChild(el);
+  }
+  if(missing.length > 0){
+    el.innerHTML = '<p class="note" style="color:#b3541e;margin-top:8px"><b>⚠️ חסרים חומרים:</b> ' + missing.map(esc).join(', ')
+      + '<br>מומלץ לקנות לפני הטיפול. <button class="link-btn" onclick="closeModal(\'healthAssessModal\');showScreen(\'fertilizers\')">למסך הדשנים</button></p>';
+  } else if(available.length > 0){
+    el.innerHTML = '<p class="note" style="color:#0b8a48;margin-top:8px">✅ כל החומרים (' + available.map(f => esc(f.name)).join(', ') + ') במלאי</p>';
+  } else {
+    el.innerHTML = '';
+  }
 }
 
 function submitHealthTreatment(){
@@ -1848,16 +1944,55 @@ function submitHealthAssessment(){
   }
 }
 /* ================= מאגר דשנים ================= */
+// לכל חומר: inStock (במלאי?), quantity (כמות חופשית)
 const FERTILIZERS = [
-  { id: 'kf10', name: 'KF-10', type: 'ביו-סטימולנט נוזלי', desc: 'תרכיז אצות, חלבונים, ויטמינים ומיצויי צמחים. משפר קליטת מינרלים ועמידות לעקות חום/קור. מאושר לחקלאות אורגנית.', dosage: 'עדנית 80 ס"מ: 10 מ"ל ב-2.5 ליטר מים, בהגמעה, פעם בחודש.', mixable: true, photo: null },
-  { id: 'kfgb', name: 'KF G&B', type: 'דשן NPK נוזלי', desc: 'דשן בסיסי: חנקן 2.82%, זרחן 1.88%, אשלגן 5.64% + מיקרו-אלמנטים.', dosage: '2.5–4.2 מ"ל לכל ליטר מי השקיה, דרך הקרקע בלבד.', warning: 'לא לרסס על עלים!', mixable: true, photo: null },
-  { id: 'kfmicro', name: 'KF MICRO', type: 'מיקרו-אלמנטים', desc: 'ברזל 3.4%, מנגן 1.8%, אבץ, בורון, מוליבדן, מגנזיום, סידן — מכולתים בחומצות אמינו.', dosage: 'הגמעה: 10–40 מ"ל/ליטר; ריסוס עלוותי: 3–6 מ"ל/ליטר.', warning: 'בריסוס — לא מעל 24°C.', mixable: true, photo: null },
-  { id: 'kfaci', name: 'KF ACO ACID', type: 'מוריד pH', desc: 'חומצה ציטרית טבעית 20%. מוריד pH של מי ההשקיה והקרקע, משפר זמינות דשנים.', dosage: 'לפי בדיקת pH — יעד 5.5–6.5. המינון באתר דורש בירור מול VGI.', mixable: true, photo: null },
-  { id: 'kfguard', name: 'KF Guard', type: 'הגנה (לא דשן!)', desc: '40% שמן נים + 20% מיצויי צמחים. נגד כנימות, אקריות, טריפסים.', dosage: 'עדנית 80 ס"מ: 10–15 מ"ל ב-2.5 ליטר מים, בהגמעה או ריסוס, פעם בחודש.', warning: 'לא לרסס מעל 24°C! יומיים המתנה לפני קטיף. אין לערבב עם שום דבר!', mixable: false, photo: null },
-  { id: 'bbspring', name: 'דשן אביב גרגירי', type: 'דשן בשחרור איטי (ערכת אוכמניות)', desc: 'דשן גרגירי לעונת הצמיחה והפריחה של אוכמניות.', dosage: '50–75 גרם לעציץ 25 ליטר, בתחילת מרץ.', mixable: true, photo: 'img/fertilizers/kit-fertilizers.jpg' },
-  { id: 'bbautumn', name: 'דשן סתיו גרגירי', type: 'דשן בשחרור איטי (ערכת אוכמניות)', desc: 'דשן גרגירי לחיזוק הצמח לאחר קטיף ותמיכה במנוחה.', dosage: '50–75 גרם לעציץ 25 ליטר, בתחילת אוגוסט.', mixable: true, photo: 'img/fertilizers/kit-fertilizers.jpg' },
-  { id: 'sulfur', name: 'גופרית 99.9%', type: 'מחמצן קרקע', desc: 'גופרית טהורה להורדת pH הקרקע. קריטי לאוכמניות — בלי חומציות נכונה הצמח לא קולט דשן.', dosage: '2.5 כפות לעציץ 25 ליטר, כל 3–4 חודשים (מרץ, יוני, ספטמבר — לא בחורף).', mixable: true, photo: 'img/fertilizers/kit-fertilizers.jpg' },
+  { id: 'kf10', name: 'KF-10', type: 'ביו-סטימולנט נוזלי', desc: 'תרכיז אצות, חלבונים, ויטמינים ומיצויי צמחים. משפר קליטת מינרלים ועמידות לעקות חום/קור. מאושר לחקלאות אורגנית.', dosage: 'עדנית 80 ס"מ: 10 מ"ל ב-2.5 ליטר מים, בהגמעה, פעם בחודש.', mixable: true, photo: null, inStock: true, quantity: '' },
+  { id: 'kfgb', name: 'KF G&B', type: 'דשן NPK נוזלי', desc: 'דשן בסיסי: חנקן 2.82%, זרחן 1.88%, אשלגן 5.64% + מיקרו-אלמנטים.', dosage: '2.5–4.2 מ"ל לכל ליטר מי השקיה, דרך הקרקע בלבד.', warning: 'לא לרסס על עלים!', mixable: true, photo: null, inStock: true, quantity: '' },
+  { id: 'kfmicro', name: 'KF MICRO', type: 'מיקרו-אלמנטים', desc: 'ברזל 3.4%, מנגן 1.8%, אבץ, בורון, מוליבדן, מגנזיום, סידן — מכולתים בחומצות אמינו.', dosage: 'הגמעה: 10–40 מ"ל/ליטר; ריסוס עלוותי: 3–6 מ"ל/ליטר.', warning: 'בריסוס — לא מעל 24°C.', mixable: true, photo: null, inStock: true, quantity: '' },
+  { id: 'kfaci', name: 'KF ACO ACID', type: 'מוריד pH', desc: 'חומצה ציטרית טבעית 20%. מוריד pH של מי ההשקיה והקרקע, משפר זמינות דשנים.', dosage: 'לפי בדיקת pH — יעד 5.5–6.5. המינון באתר דורש בירור מול VGI.', mixable: true, photo: null, inStock: true, quantity: '' },
+  { id: 'kfguard', name: 'KF Guard', type: 'הגנה (לא דשן!)', desc: '40% שמן נים + 20% מיצויי צמחים. נגד כנימות, אקריות, טריפסים.', dosage: 'עדנית 80 ס"מ: 10–15 מ"ל ב-2.5 ליטר מים, בהגמעה או ריסוס, פעם בחודש.', warning: 'לא לרסס מעל 24°C! יומיים המתנה לפני קטיף. אין לערבב עם שום דבר!', mixable: false, photo: null, inStock: true, quantity: '' },
+  { id: 'bbspring', name: 'דשן אביב גרגירי', type: 'דשן בשחרור איטי (ערכת אוכמניות)', desc: 'דשן גרגירי לעונת הצמיחה והפריחה של אוכמניות.', dosage: '50–75 גרם לעציץ 25 ליטר, בתחילת מרץ.', mixable: true, photo: 'img/fertilizers/kit-fertilizers.jpg', inStock: true, quantity: '250 גרם' },
+  { id: 'bbautumn', name: 'דשן סתיו גרגירי', type: 'דשן בשחרור איטי (ערכת אוכמניות)', desc: 'דשן גרגירי לחיזוק הצמח לאחר קטיף ותמיכה במנוחה.', dosage: '50–75 גרם לעציץ 25 ליטר, בתחילת אוגוסט.', mixable: true, photo: 'img/fertilizers/kit-fertilizers.jpg', inStock: true, quantity: '250 גרם' },
+  { id: 'sulfur', name: 'גופרית 99.9%', type: 'מחמצן קרקע', desc: 'גופרית טהורה להורדת pH הקרקע. קריטי לאוכמניות — בלי חומציות נכונה הצמח לא קולט דשן.', dosage: '2.5 כפות לעציץ 25 ליטר, כל 3–4 חודשים (מרץ, יוני, ספטמבר — לא בחורף).', mixable: true, photo: 'img/fertilizers/kit-fertilizers.jpg', inStock: true, quantity: '250 גרם + 500 גרם 80%' },
 ];
+
+// מיפוי טיפול → חומרים נדרשים (מהמלאי)
+const TREATMENT_MATERIALS = {
+  iron_foliar:    ['kfmicro'],
+  iron_soil:      ['kfmicro', 'sulfur'],
+  overwater_mild: [],
+  overwater_severe: [],
+  underwater:     [],
+  pest_neem:      ['kfguard'],
+  npk_liquid:     ['kfgb'],
+  npk_slow:       ['bbspring', 'bbautumn'],
+  transplant:     ['kf10'],
+  prune_soft:     ['kf10'],
+  prune_woody:    ['kf10'],
+};
+
+// חומרים מותאמים אישית שהמשתמש הוסיף (נשמרים ב-state)
+function getCustomFertilizers(){
+  if(!Array.isArray(state.customFertilizers)) state.customFertilizers = [];
+  return state.customFertilizers;
+}
+function getAllFertilizers(){
+  return FERTILIZERS.concat(getCustomFertilizers());
+}
+function getFertilizer(id){
+  return getAllFertilizers().find(f => f.id === id);
+}
+function checkMaterials(treatmentType){
+  // מחזיר: { available: [...], missing: [...] } — לפי המלאי בפועל
+  const needed = TREATMENT_MATERIALS[treatmentType] || [];
+  const available = [], missing = [];
+  for(const fid of needed){
+    const f = getFertilizer(fid);
+    if(f && getFertStock(fid)) available.push(f);
+    else missing.push(f ? f.name : fid);
+  }
+  return { available, missing };
+}
 function renderPlanters(){
   const box = $('plantersList');
   if(!box) return;
@@ -1913,21 +2048,69 @@ function savePlanter(){
 function renderFertilizers(){
   const box = $('fertList');
   if(!box) return;
-  box.innerHTML = FERTILIZERS.map(f =>
-    '<div class="card" style="margin:8px 0;padding:12px">'
+  const all = getAllFertilizers();
+  box.innerHTML = all.map(f => {
+    const inStock = getFertStock(f.id);
+    return '<div class="card" style="margin:8px 0;padding:12px;opacity:' + (inStock ? '1' : '0.6') + '">'
     + (f.photo ? '<img src="' + f.photo + '" style="width:100%;border-radius:10px;margin-bottom:8px" alt="' + esc(f.name) + '">' : '')
-    + '<div class="zone-name">' + esc(f.name) + '</div>'
-    + '<div class="note">' + esc(f.type) + '</div>'
+    + '<div style="display:flex;align-items:center;gap:8px">'
+    + '<div class="zone-name" style="flex:1">' + esc(f.name) + '</div>'
+    + '<span class="chip ' + (inStock ? 'auto' : '') + '">' + (inStock ? 'במלאי ✅' : 'אזל ❌') + '</span>'
+    + '</div>'
+    + '<div class="note">' + esc(f.type) + (f.quantity ? ' · ' + esc(f.quantity) : '') + '</div>'
     + '<p class="note" style="margin:6px 0">' + esc(f.desc) + '</p>'
     + '<p class="note"><b>מינון:</b> ' + esc(f.dosage) + '</p>'
     + (f.warning ? '<p class="note" style="color:#b3541e"><b>⚠️ ' + esc(f.warning) + '</b></p>' : '')
     + '<p class="note">' + (f.mixable ? '✅ ניתן לערבב עם דשנים אחרים' : '❌ אין לערבב — ליישם בנפרד') + '</p>'
+    + '<div class="btn-row" style="margin-top:8px">'
+    + '<button class="btn secondary" style="padding:4px 10px;font-size:12px" onclick="toggleFertStock(\'' + f.id + '\')">'
+    + (inStock ? 'סמן שאזל' : 'סמן כבמלאי') + '</button>'
+    + (f.custom ? '<button class="btn secondary" style="padding:4px 10px;font-size:12px" onclick="deleteCustomFert(\'' + f.id + '\')">מחק</button>' : '')
     + '</div>'
-  ).join('')
+    + '</div>';
+  }).join('')
+  + '<button class="btn" style="width:100%;margin:8px 0" onclick="openModal(\'addFertModal\')">+ קניתי חומר חדש</button>'
   + '<div class="card" style="margin:8px 0;padding:12px;background:#f0f7f0">'
   + '<div class="zone-name">כללי ערבוב</div>'
   + '<p class="note" style="white-space:pre-line">ארבעת דשני KF (KF-10, G&B, MICRO, ACO ACID) — מותר לערבב יחד.\nסדר ערבוב: מים ← KF-10 ← G&B ← MICRO ← חומצה אחרונה.\nKF Guard — תמיד בנפרד, לעולם לא לערבב!</p>'
   + '</div>';
+}
+
+function getFertStock(fid){
+  // מחזיר true אם במלאי (בודק state.fertStock קודם, אחרת ברירת מחדל)
+  if(state.fertStock && fid in state.fertStock) return state.fertStock[fid];
+  const f = FERTILIZERS.find(x => x.id === fid) || getCustomFertilizers().find(x => x.id === fid);
+  return f ? f.inStock !== false : true;
+}
+
+function toggleFertStock(fid){
+  if(!state.fertStock) state.fertStock = {};
+  state.fertStock[fid] = !getFertStock(fid);
+  save(); renderAll();
+  toast(getFertStock(fid) ? 'סומן כבמלאי ✅' : 'סומן כאזל ❌');
+}
+
+function deleteCustomFert(fid){
+  const arr = getCustomFertilizers();
+  const i = arr.findIndex(x => x.id === fid);
+  if(i >= 0){ arr.splice(i, 1); save(); renderAll(); toast('נמחק'); }
+}
+
+function addCustomFert(){
+  const name = $('cf_name').value.trim();
+  if(!name){ toast('צריך שם לחומר'); return; }
+  getCustomFertilizers().push({
+    id: 'custom_' + uid(), custom: true,
+    name: name,
+    type: $('cf_type').value.trim() || 'חומר חדש',
+    desc: $('cf_desc').value.trim(),
+    dosage: $('cf_dosage').value.trim(),
+    quantity: $('cf_qty').value.trim(),
+    mixable: true, photo: null, inStock: true
+  });
+  save(); closeModal('addFertModal'); renderAll();
+  $('cf_name').value = ''; $('cf_type').value = ''; $('cf_desc').value = ''; $('cf_dosage').value = ''; $('cf_qty').value = '';
+  toast('נוסף למלאי ✅');
 }
 
 function buildDaysPicker(selected){
@@ -1980,7 +2163,7 @@ function renderSettings(){
 }
 
 /* ================= רינדור כללי ================= */
-function renderAll(){ renderHome(); renderPlants(); renderPlanters(); renderIrrigation(); renderFertilizers(); renderHealthCheck(); renderRecoveryTracking(); renderSettings(); }
+function renderAll(){ renderHome(); renderPlants(); renderPlanters(); renderIrrigation(); renderFertilizers(); renderHealthCheck(); renderRecoveryTracking(); renderTreatmentTasks(); renderSettings(); }
 
 /* ================= טיפול בצמחים ================= */
 function markCare(plantId, type){
