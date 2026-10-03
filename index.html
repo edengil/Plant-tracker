@@ -2316,10 +2316,10 @@ buildDaysPicker([]);
 (function seedEdenPlants(){
   try{
     const seeds = [
-      { seedId: 'eden-wormwood-1', name: 'לענה 1', category: 'עשבי תיבול', location: 'מרפסת', photo: 'img/wormwood-1.jpg',
-        notes: 'לענה (Artemisia) — שימושים: חליטת תה מסורתית לעיכול; צמח מרפא עממי; דוחה חרקים ומזיקים בגינה; צמח נוי בעל עלווה כסופה.' },
-      { seedId: 'eden-wormwood-2', name: 'לענה 2', category: 'עשבי תיבול', location: 'מרפסת', photo: 'img/wormwood-2.jpg',
-        notes: 'לענה (Artemisia) — שימושים: חליטת תה מסורתית לעיכול; צמח מרפא עממי; דוחה חרקים ומזיקים בגינה; צמח נוי בעל עלווה כסופה.' },
+      { seedId: 'eden-wormwood-1', name: 'לענה 1', category: 'עשבי תיבול', location: 'עדנית גדולה', photo: 'img/wormwood-1.jpg',
+        notes: 'לענה (Artemisia) — בעדנית גדולה עם לענה 2 וצמח נוסף. שימושים: חליטת תה מסורתית לעיכול; צמח מרפא עממי; דוחה חרקים ומזיקים בגינה; צמח נוי בעל עלווה כסופה.' },
+      { seedId: 'eden-wormwood-2', name: 'לענה 2', category: 'עשבי תיבול', location: 'עדנית גדולה', photo: 'img/wormwood-2.jpg',
+        notes: 'לענה (Artemisia) — בעדנית גדולה עם לענה 1 וצמח נוסף. שימושים: חליטת תה מסורתית לעיכול; צמח מרפא עממי; דוחה חרקים ומזיקים בגינה; צמח נוי בעל עלווה כסופה.' },
       { seedId: 'eden-blueberry-1', name: 'אוכמניות בילוקסי 1', category: 'גינה', location: 'עדנית לבד במרפסת', photo: 'img/blueberry-before.jpg',
         notes: 'בעדנית לבד. תמונת "לפני" מנובמבר 2025 — סימני כלורוזיס מחוסר חומציות. טיפול: גופרית 2.5 כפות + דשן סתיו 50-75 גרם (אוקטובר 2026). לוז קבוע: גופרית במרץ/יוני/ספטמבר, דשן אביב במרץ, דשן סתיו באוגוסט.' },
       { seedId: 'eden-blueberry-2', name: 'אוכמניות בילוקסי 2 (קטן)', category: 'גינה', location: 'עדנית ארוכה עם שיח רוזמרין', photo: 'img/blueberry-2-before.jpg',
@@ -2340,7 +2340,15 @@ buildDaysPicker([]);
       if(!bb1.notes.startsWith('בעדנית לבד.')) bb1.notes = 'בעדנית לבד. ' + bb1.notes;
       save();
     }
-    /* תיקון חד-פעמי: אוכמניות 2 הקטן בעדנית ארוכה עם רוזמרין */
+    /* תיקון חד-פעמי: לענות בעדנית גדולה */
+    for(const wid of ['eden-wormwood-1', 'eden-wormwood-2']){
+      const w = state.plants.find(p => p.seedId === wid);
+      if(w && (w.location === 'מרפסת' || w.location === 'עדנית גדולה' && !w.notes.includes('בעדנית גדולה עם'))){
+        w.location = 'עדנית גדולה';
+        if(!w.notes.includes('בעדנית גדולה')) w.notes = w.notes.replace('לענה (Artemisia) —', 'לענה (Artemisia) — בעדנית גדולה עם לענה נוספת וצמח נוסף.');
+        save();
+      }
+    }
     const bb2 = state.plants.find(p => p.seedId === 'eden-blueberry-2');
     if(bb2 && bb2.location === 'מרפסת'){
       bb2.name = 'אוכמניות בילוקסי 2 (קטן)';
