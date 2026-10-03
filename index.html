@@ -468,6 +468,44 @@ a{color:var(--green-dark)}
     <div id="zonesList"></div>
   </section>
 
+  <!-- ================= FERTILIZERS ================= -->
+  <section class="screen" id="screen-fertilizers">
+    <h2 class="section-title">דשנים וחומרים</h2>
+    <div class="card">
+      <h3>מאגר הדשנים שלי</h3>
+      <p class="note">כל החומרים שברשותך, עם מינונים והוראות ערבוב.</p>
+      <div id="fertList"></div>
+    </div>
+    <div class="card">
+      <h3>מדריך גידול אוכמניות 🫐</h3>
+      <p class="note">ממשתלת אקזוטיקה — הוראות מלאות לטיפול.</p>
+      <div class="field">
+        <label>דישון</label>
+        <p class="note" style="white-space:pre-line">גופרית: 2.5 כפות לעציץ 25 ליטר, כל 3–4 חודשים (תחילת מרץ, יוני, ספטמבר — לא בחורף).
+דשן אביב גרגירי: 50–75 גרם לעציץ 25 ליטר, בתחילת מרץ.
+דשן סתיו גרגירי: 50–75 גרם לעציץ 25 ליטר, בתחילת אוגוסט.
+אחרי דישון: חיפוי 3–5 ס"מ שבבי אורן מסביב (לא צמוד לגזע).</p>
+      </div>
+      <div class="field">
+        <label>השקיה</label>
+        <p class="note" style="white-space:pre-line">להשקות עד נגירה מחורי הניקוז. לתת לאדמה להתייבש מעט בין השקיות — לבדוק 3–5 ס"מ עומק עם האצבע. בקיץ ובפריחה להשקות יותר.</p>
+      </div>
+      <div class="field">
+        <label>גיזום</label>
+        <p class="note" style="white-space:pre-line">מיד אחרי הקטיף: לקטום קצות ענפים ולעצב לגובה 1–1.5 מטר. להסיר ענפים צומחים פנימה וענפים בני שנתיים.</p>
+      </div>
+      <div class="field">
+        <label>האבקה</label>
+        <p class="note" style="white-space:pre-line">עם זן שני ליד היבול גדל משמעותית. בלי דבורים — להאביק ידנית עם מכחול כשהפרחים פתוחים.</p>
+      </div>
+      <div class="field">
+        <label>תמונות המדריך המקורי</label>
+        <img src="img/guides/blueberry-guide-1.jpg" style="width:100%;border-radius:12px;margin-bottom:8px" alt="מדריך אוכמניות עמוד 1">
+        <img src="img/guides/blueberry-guide-2.jpg" style="width:100%;border-radius:12px" alt="מדריך אוכמניות עמוד 2">
+      </div>
+    </div>
+  </section>
+
   <!-- ================= SETTINGS ================= -->
   <section class="screen" id="screen-settings">
     <h2 class="section-title">הגדרות</h2>
@@ -537,6 +575,7 @@ a{color:var(--green-dark)}
   <button class="nav-btn" data-nav="plants"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-7"/><path d="M12 14c0-3.9 2.9-6.5 7.5-6.5C19.5 11.4 16.6 14 12 14z"/><path d="M12 10.5C12 7 9.6 4.8 5 4.8c0 3.7 2.4 5.7 7 5.7z"/></svg></span>צמחים</button>
   <button class="camera-btn" id="cameraBtn" aria-label="זיהוי מצילום"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
   <button class="nav-btn" data-nav="irrigation"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5s6 6.6 6 10.5a6 6 0 0 1-12 0C6 10.1 12 3.5 12 3.5z"/></svg></span>השקיה</button>
+  <button class="nav-btn" data-nav="fertilizers"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M8 6h8"/><path d="M7 10h10"/><path d="M9 14h6"/><path d="M10 18h4"/></svg></span>דשנים</button>
   <button class="nav-btn" data-nav="settings"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg></span>הגדרות</button>
 </nav>
 
@@ -1419,6 +1458,37 @@ async function pushSchedulesToWorker(){
   }catch(e){ if(st) st.textContent = 'שגיאת רשת בדחיפה לשרת.'; }
 }
 
+/* ================= מאגר דשנים ================= */
+const FERTILIZERS = [
+  { id: 'kf10', name: 'KF-10', type: 'ביו-סטימולנט נוזלי', desc: 'תרכיז אצות, חלבונים, ויטמינים ומיצויי צמחים. משפר קליטת מינרלים ועמידות לעקות חום/קור. מאושר לחקלאות אורגנית.', dosage: 'עדנית 80 ס"מ: 10 מ"ל ב-2.5 ליטר מים, בהגמעה, פעם בחודש.', mixable: true, photo: null },
+  { id: 'kfgb', name: 'KF G&B', type: 'דשן NPK נוזלי', desc: 'דשן בסיסי: חנקן 2.82%, זרחן 1.88%, אשלגן 5.64% + מיקרו-אלמנטים.', dosage: '2.5–4.2 מ"ל לכל ליטר מי השקיה, דרך הקרקע בלבד.', warning: 'לא לרסס על עלים!', mixable: true, photo: null },
+  { id: 'kfmicro', name: 'KF MICRO', type: 'מיקרו-אלמנטים', desc: 'ברזל 3.4%, מנגן 1.8%, אבץ, בורון, מוליבדן, מגנזיום, סידן — מכולתים בחומצות אמינו.', dosage: 'הגמעה: 10–40 מ"ל/ליטר; ריסוס עלוותי: 3–6 מ"ל/ליטר.', warning: 'בריסוס — לא מעל 24°C.', mixable: true, photo: null },
+  { id: 'kfaci', name: 'KF ACO ACID', type: 'מוריד pH', desc: 'חומצה ציטרית טבעית 20%. מוריד pH של מי ההשקיה והקרקע, משפר זמינות דשנים.', dosage: 'לפי בדיקת pH — יעד 5.5–6.5. המינון באתר דורש בירור מול VGI.', mixable: true, photo: null },
+  { id: 'kfguard', name: 'KF Guard', type: 'הגנה (לא דשן!)', desc: '40% שמן נים + 20% מיצויי צמחים. נגד כנימות, אקריות, טריפסים.', dosage: 'עדנית 80 ס"מ: 10–15 מ"ל ב-2.5 ליטר מים, בהגמעה או ריסוס, פעם בחודש.', warning: 'לא לרסס מעל 24°C! יומיים המתנה לפני קטיף. אין לערבב עם שום דבר!', mixable: false, photo: null },
+  { id: 'bbspring', name: 'דשן אביב גרגירי', type: 'דשן בשחרור איטי (ערכת אוכמניות)', desc: 'דשן גרגירי לעונת הצמיחה והפריחה של אוכמניות.', dosage: '50–75 גרם לעציץ 25 ליטר, בתחילת מרץ.', mixable: true, photo: 'img/fertilizers/kit-fertilizers.jpg' },
+  { id: 'bbautumn', name: 'דשן סתיו גרגירי', type: 'דשן בשחרור איטי (ערכת אוכמניות)', desc: 'דשן גרגירי לחיזוק הצמח לאחר קטיף ותמיכה במנוחה.', dosage: '50–75 גרם לעציץ 25 ליטר, בתחילת אוגוסט.', mixable: true, photo: 'img/fertilizers/kit-fertilizers.jpg' },
+  { id: 'sulfur', name: 'גופרית 99.9%', type: 'מחמצן קרקע', desc: 'גופרית טהורה להורדת pH הקרקע. קריטי לאוכמניות — בלי חומציות נכונה הצמח לא קולט דשן.', dosage: '2.5 כפות לעציץ 25 ליטר, כל 3–4 חודשים (מרץ, יוני, ספטמבר — לא בחורף).', mixable: true, photo: 'img/fertilizers/kit-fertilizers.jpg' },
+];
+function renderFertilizers(){
+  const box = $('fertList');
+  if(!box) return;
+  box.innerHTML = FERTILIZERS.map(f =>
+    '<div class="card" style="margin:8px 0;padding:12px">'
+    + (f.photo ? '<img src="' + f.photo + '" style="width:100%;border-radius:10px;margin-bottom:8px" alt="' + esc(f.name) + '">' : '')
+    + '<div class="zone-name">' + esc(f.name) + '</div>'
+    + '<div class="note">' + esc(f.type) + '</div>'
+    + '<p class="note" style="margin:6px 0">' + esc(f.desc) + '</p>'
+    + '<p class="note"><b>מינון:</b> ' + esc(f.dosage) + '</p>'
+    + (f.warning ? '<p class="note" style="color:#b3541e"><b>⚠️ ' + esc(f.warning) + '</b></p>' : '')
+    + '<p class="note">' + (f.mixable ? '✅ ניתן לערבב עם דשנים אחרים' : '❌ אין לערבב — ליישם בנפרד') + '</p>'
+    + '</div>'
+  ).join('')
+  + '<div class="card" style="margin:8px 0;padding:12px;background:#f0f7f0">'
+  + '<div class="zone-name">כללי ערבוב</div>'
+  + '<p class="note" style="white-space:pre-line">ארבעת דשני KF (KF-10, G&B, MICRO, ACO ACID) — מותר לערבב יחד.\nסדר ערבוב: מים ← KF-10 ← G&B ← MICRO ← חומצה אחרונה.\nKF Guard — תמיד בנפרד, לעולם לא לערבב!</p>'
+  + '</div>';
+}
+
 function buildDaysPicker(selected){
   $('z_days').innerHTML = WEEKDAYS.map((n, i) =>
     '<label><input type="checkbox" value="' + i + '"' + (selected && selected.includes(i) ? ' checked' : '') + '>' + n + '</label>'
@@ -1469,7 +1539,7 @@ function renderSettings(){
 }
 
 /* ================= רינדור כללי ================= */
-function renderAll(){ renderHome(); renderPlants(); renderIrrigation(); renderSettings(); }
+function renderAll(){ renderHome(); renderPlants(); renderIrrigation(); renderFertilizers(); renderSettings(); }
 
 /* ================= טיפול בצמחים ================= */
 function markCare(plantId, type){
@@ -2241,6 +2311,31 @@ $('backupImport').addEventListener('change', e => {
 /* ================= אתחול ================= */
 $('dateLine').textContent = new Intl.DateTimeFormat('he-IL', { weekday:'long', day:'numeric', month:'long', year:'numeric' }).format(new Date());
 buildDaysPicker([]);
+
+/* זריעת צמחים ראשונית מעדן (רץ פעם אחת — בודק לפי מזהה ייחודי) */
+(function seedEdenPlants(){
+  try{
+    const seeds = [
+      { seedId: 'eden-wormwood-1', name: 'לענה 1', category: 'עשבי תיבול', location: 'מרפסת', photo: 'img/wormwood-1.jpg',
+        notes: 'לענה (Artemisia) — שימושים: חליטת תה מסורתית לעיכול; צמח מרפא עממי; דוחה חרקים ומזיקים בגינה; צמח נוי בעל עלווה כסופה.' },
+      { seedId: 'eden-wormwood-2', name: 'לענה 2', category: 'עשבי תיבול', location: 'מרפסת', photo: 'img/wormwood-2.jpg',
+        notes: 'לענה (Artemisia) — שימושים: חליטת תה מסורתית לעיכול; צמח מרפא עממי; דוחה חרקים ומזיקים בגינה; צמח נוי בעל עלווה כסופה.' },
+      { seedId: 'eden-blueberry-1', name: 'אוכמניות בילוקסי 1', category: 'גינה', location: 'מרפסת', photo: 'img/blueberry-before.jpg',
+        notes: 'תמונת "לפני" מנובמבר 2025 — סימני כלורוזיס מחוסר חומציות. טיפול: גופרית 2.5 כפות + דשן סתיו 50-75 גרם (אוקטובר 2026). לוז קבוע: גופרית במרץ/יוני/ספטמבר, דשן אביב במרץ, דשן סתיו באוגוסט.' },
+      { seedId: 'eden-blueberry-2', name: 'אוכמניות בילוקסי 2', category: 'גינה', location: 'מרפסת', photo: 'img/blueberry-2-before.jpg',
+        notes: 'תמונת "לפני" מנובמבר 2025. טיפול: גופרית 2.5 כפות + דשן סתיו 50-75 גרם (אוקטובר 2026). לוז קבוע: גופרית במרץ/יוני/ספטמבר, דשן אביב במרץ, דשן סתיו באוגוסט.' },
+    ];
+    let added = false;
+    for(const s of seeds){
+      if(!state.plants.some(p => p.seedId === s.seedId)){
+        state.plants.push(Object.assign({ id: uid(), history: [], mode: 'manual', waterInterval: 0, fertInterval: 0, lastWater: null, lastFert: null }, s));
+        added = true;
+      }
+    }
+    if(added) save();
+  }catch(e){}
+})();
+
 renderAll();
 fbInit();
 maybeNotifyOnOpen();
