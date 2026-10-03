@@ -342,6 +342,9 @@ a{color:var(--green-dark)}
     <h2 class="section-title" id="todayTitle">לטיפול היום</h2>
     <div id="todayList"></div>
 
+    <h2 class="section-title">בדיקת בריאות 📸 <span class="sub">צמחים שצריכים תמונה עדכנית</span></h2>
+    <div id="healthCheckList"></div>
+
     <h2 class="section-title">השקיה אוטומטית קרובה</h2>
     <div id="autoList"></div>
 
@@ -359,6 +362,9 @@ a{color:var(--green-dark)}
     <div class="filter-row" id="plantChips"></div>
     <div class="plant-grid" id="plantsGrid"></div>
     <div id="plantsEmpty"></div>
+
+    <h2 class="section-title">העדניות שלי <span class="sub">ממוספרות עם פרטים</span></h2>
+    <div id="plantersList"></div>
   </section>
 
   <!-- ================= IRRIGATION ================= -->
@@ -729,6 +735,63 @@ a{color:var(--green-dark)}
     </div>
   </div>
 </div>
+
+<!-- מודל עריכת עדנית -->
+<div class="modal-backdrop" id="planterModal">
+  <div class="modal">
+    <div class="modal-head"><h3>עריכת עדנית</h3><button class="x-btn" onclick="closeModal('planterModal')">✕</button></div>
+    <div class="field"><label>מספר עדנית</label><input type="number" id="pl_number" min="1"></div>
+    <div class="field"><label>שם</label><input type="text" id="pl_name"></div>
+    <div class="field"><label>קיבולת (ליטרים)</label><input type="number" id="pl_capacity" min="1" placeholder="למשל: 25"></div>
+    <div class="field"><label>סוג אדמה</label><input type="text" id="pl_soil" placeholder="למשל: תערובת חומצית"></div>
+    <div class="field"><label>מיקום</label><input type="text" id="pl_location" placeholder="למשל: מרפסת מזרח"></div>
+    <div class="field"><label>הערות</label><textarea id="pl_notes" rows="2"></textarea></div>
+    <div class="btn-row"><button class="btn" onclick="savePlanter()">שמור</button></div>
+  </div>
+</div>
+
+<!-- מודל תמונה לבדיקת בריאות -->
+<div class="modal-backdrop" id="healthPhotoModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="healthPhotoTitle">תמונה עדכנית</h3><button class="x-btn" onclick="closeModal('healthPhotoModal')">✕</button></div>
+    <p class="note">צלם או בחר תמונה עדכנית של הצמח. התמונה האחרונה תוצג תמיד בכרטיס הצמח.</p>
+    <div class="field"><input type="file" id="healthPhotoInput" accept="image/*" capture="environment"></div>
+    <div class="btn-row"><button class="btn" onclick="submitHealthPhoto()">העלה והמשך להערכה</button></div>
+  </div>
+</div>
+
+<!-- מודל הערכת בריאות -->
+<div class="modal-backdrop" id="healthAssessModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="healthAssessTitle">הערכת מצב</h3><button class="x-btn" onclick="closeModal('healthAssessModal')">✕</button></div>
+    <img id="healthAssessImg" style="width:100%;border-radius:12px;margin-bottom:12px">
+    <div class="field">
+      <label>איך נראים העלים?</label>
+      <div class="radio-row">
+        <label><input type="radio" name="ha_leaves" value="green"> ירוקים ובריאים</label>
+        <label><input type="radio" name="ha_leaves" value="yellow"> מצהיבים</label>
+        <label><input type="radio" name="ha_leaves" value="brown"> קצוות חומים</label>
+      </div>
+    </div>
+    <div class="field">
+      <label>יש צמיחה חדשה?</label>
+      <div class="radio-row">
+        <label><input type="radio" name="ha_growth" value="yes"> כן</label>
+        <label><input type="radio" name="ha_growth" value="no"> לא</label>
+      </div>
+    </div>
+    <div class="field">
+      <label>מצב האדמה?</label>
+      <div class="radio-row">
+        <label><input type="radio" name="ha_soil" value="moist"> לחה</label>
+        <label><input type="radio" name="ha_soil" value="dry"> יבשה</label>
+        <label><input type="radio" name="ha_soil" value="wet"> רטובה מדי</label>
+      </div>
+    </div>
+    <div class="btn-row"><button class="btn" onclick="submitHealthAssessment()">קבל המלצות</button></div>
+    <div id="healthAssessResult"></div>
+  </div>
+</div>
 <input type="file" class="hidden-input" id="diagPhotoInput" accept="image/*">
 
 <!-- ================= COMPARE MODAL ================= -->
@@ -796,7 +859,7 @@ const GALLERY = [
   { name:'עץ זית', cat:'גינה', img:'img/plants/olive.jpg', water:7, fert:45, loc:'מרפסת או גינה' }
 ];
 
-function defaultState(){ return { plants:[], zones:[], schedules:[], systemName:'', apiKey:'', tuyaDeviceId:'bf85d5de5a889a5ce5rfft', notif:null, deletedPlants:[], settingsUpdatedAt:null }; }
+function defaultState(){ return { plants:[], planters:[], zones:[], schedules:[], systemName:'', apiKey:'', tuyaDeviceId:'bf85d5de5a889a5ce5rfft', notif:null, deletedPlants:[], settingsUpdatedAt:null }; }
 function loadState(){
   try{
     const raw = localStorage.getItem(LS_KEY);
@@ -1458,6 +1521,155 @@ async function pushSchedulesToWorker(){
   }catch(e){ if(st) st.textContent = 'שגיאת רשת בדחיפה לשרת.'; }
 }
 
+/* ================= עדניות ================= */
+const PLANTER_SEEDS = [
+  { seedId: 'pl-blueberry1', number: 1, name: 'עדנית אוכמניות 1', capacityLiters: 25, soilType: 'תערובת חומצית לאוכמניות', location: 'מרפסת', notes: 'אוכמניות בילוקסי 1 לבד' },
+  { seedId: 'pl-blueberry2', number: 2, name: 'עדנית ארוכה אוכמניות 2 + רוזמרין', capacityLiters: null, soilType: '', location: 'מרפסת', notes: 'אוכמניות 2 הקטן + שיח רוזמרין — לא להחמיץ את כל הקרקע!' },
+  { seedId: 'pl-large-herbs', number: 3, name: 'עדנית גדולה עשבים', capacityLiters: null, soilType: '', location: 'מרפסת', notes: 'לענה 1+2, זוטה לבנה' },
+  { seedId: 'pl-new-herbs', number: 4, name: 'עדנית חדשה עשבים', capacityLiters: null, soilType: '', location: 'מרפסת', notes: 'פטרוזיליה + מרווה' },
+  { seedId: 'pl-pepper-basil', number: 5, name: 'עדנית פלפל ובזיליקום', capacityLiters: null, soilType: '', location: 'מרפסת', notes: 'פלפל צ׳ילי + 3 בזיליקום' },
+  { seedId: 'pl-lavender', number: 6, name: 'עדנית לוונדר', capacityLiters: null, soilType: '', location: 'מרפסת', notes: '3 שתילי לוונדר' },
+  { seedId: 'pl-ficus', number: 7, name: 'עדנית פיקוס וקורדילין', capacityLiters: null, soilType: '', location: '', notes: 'פיקוס גומי + קורדילין' },
+  { seedId: 'pl-lemongrass-rose', number: 8, name: 'עדנית לימונית ורוזמרין', capacityLiters: null, soilType: '', location: '', notes: 'לימונית + 2 רוזמרין' },
+  { seedId: 'pl-louisa-melissa', number: 9, name: 'עדנית לואיזה ומליסה', capacityLiters: null, soilType: '', location: '', notes: 'לואיזה + מליסה' },
+  { seedId: 'pl-mint', number: 10, name: 'עדנית נענע', capacityLiters: null, soilType: '', location: '', notes: 'נענע לבד' },
+  { seedId: 'pl-passionfruit', number: 11, name: 'עדנית פסיפלורה', capacityLiters: null, soilType: '', location: '', notes: 'פסיפלורה לבד' },
+];
+
+const PLANT_TO_PLANTER = {
+  'eden-blueberry-1': 'pl-blueberry1',
+  'eden-blueberry-2': 'pl-blueberry2',
+  'eden-wormwood-1': 'pl-large-herbs',
+  'eden-wormwood-2': 'pl-large-herbs',
+  'eden-zutah-1': 'pl-large-herbs',
+  'eden-parsley-1': 'pl-new-herbs',
+  'eden-sage-1': 'pl-new-herbs',
+  'eden-pepper-1': 'pl-pepper-basil',
+  'eden-basil-1': 'pl-pepper-basil',
+  'eden-lavender-1': 'pl-lavender',
+  'eden-ficus-1': 'pl-ficus',
+  'eden-cordyline-1': 'pl-ficus',
+  'eden-lemongrass-1': 'pl-lemongrass-rose',
+  'eden-rosemary-1': 'pl-lemongrass-rose',
+  'eden-lemongrass-2': 'pl-louisa-melissa',
+  'eden-melissa-1': 'pl-louisa-melissa',
+  'eden-mint-1': 'pl-mint',
+  'eden-passionfruit-1': 'pl-passionfruit',
+};
+
+function seedPlanters(){
+  try{
+    if(!Array.isArray(state.planters)) state.planters = [];
+    let added = false;
+    for(const s of PLANTER_SEEDS){
+      if(!state.planters.some(p => p.seedId === s.seedId)){
+        state.planters.push(Object.assign({ id: uid() }, s));
+        added = true;
+      }
+    }
+    // שיוך צמחים לעדניות
+    for(const p of state.plants){
+      const plSeedId = PLANT_TO_PLANTER[p.seedId];
+      if(plSeedId && !p.planterId){
+        const pl = state.planters.find(x => x.seedId === plSeedId);
+        if(pl){ p.planterId = pl.id; added = true; }
+      }
+    }
+    if(added) save();
+  }catch(e){}
+}
+
+function getPlanter(id){ return (state.planters || []).find(p => p.id === id); }
+function planterPlants(planterId){ return state.plants.filter(p => p.planterId === planterId); }
+
+/* ================= בדיקת בריאות ================= */
+function plantsNeedingPhoto(){
+  const out = [];
+  const now = Date.now();
+  const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+  for(const p of state.plants){
+    // קריטריונים: אין תמונה עדכנית 30+ יום, או סימני מצוקה בהערות
+    const lastPhotoAt = p.lastPhotoAt ? new Date(p.lastPhotoAt).getTime() : 0;
+    const stressed = p.notes && /כלורוזיס|עייף|מצוקה|צהוב|נבול/i.test(p.notes);
+    const needsPhoto = (now - lastPhotoAt > THIRTY_DAYS) || stressed;
+    if(needsPhoto) out.push({ plant: p, reason: stressed ? 'סימני מצוקה' : 'לא צולם 30+ יום' });
+  }
+  return out;
+}
+
+function renderHealthCheck(){
+  const box = $('healthCheckList');
+  if(!box) return;
+  const needing = plantsNeedingPhoto();
+  if(needing.length === 0){
+    box.innerHTML = '<p class="note">כל הצמחים מעודכנים ✅</p>';
+    return;
+  }
+  box.innerHTML = needing.slice(0, 5).map(({ plant: p, reason }) =>
+    '<div class="card" style="margin:8px 0;padding:10px;display:flex;align-items:center;gap:10px">'
+    + '<img src="' + plantImg(p) + '" style="width:50px;height:50px;border-radius:10px;object-fit:cover">'
+    + '<div style="flex:1"><div class="zone-name" style="font-size:14px">' + esc(p.name) + '</div>'
+    + '<div class="note">' + esc(reason) + '</div></div>'
+    + '<button class="btn" onclick="openHealthPhoto(\'' + p.id + '\')">צלם</button>'
+    + '</div>'
+  ).join('');
+}
+
+let healthPhotoPlantId = null;
+function openHealthPhoto(plantId){
+  healthPhotoPlantId = plantId;
+  const p = state.plants.find(x => x.id === plantId);
+  if(p) $('healthPhotoTitle').textContent = 'תמונה עדכנית: ' + p.name;
+  openModal('healthPhotoModal');
+}
+
+async function submitHealthPhoto(){
+  const file = $('healthPhotoInput').files[0];
+  if(!file){ toast('בחר תמונה'); return; }
+  const p = state.plants.find(x => x.id === healthPhotoPlantId);
+  if(!p) return;
+  // שמירת התמונה הקודמת בהיסטוריה
+  if(!Array.isArray(p.photoHistory)) p.photoHistory = [];
+  if(p.photo) p.photoHistory.unshift({ at: p.lastPhotoAt || new Date().toISOString(), photo: p.photo });
+  p.photo = await compressImageFile(file);
+  p.lastPhotoAt = new Date().toISOString();
+  save(); closeModal('healthPhotoModal'); renderAll();
+  // הערכה פשוטה
+  openHealthAssessment(p.id);
+}
+
+function openHealthAssessment(plantId){
+  const p = state.plants.find(x => x.id === plantId);
+  if(!p) return;
+  $('healthAssessTitle').textContent = 'הערכת מצב: ' + p.name;
+  $('healthAssessImg').src = plantImg(p);
+  $('healthAssessResult').innerHTML = '';
+  openModal('healthAssessModal');
+}
+
+function submitHealthAssessment(){
+  const p = state.plants.find(x => x.id === $('healthAssessModal').dataset.plantId);
+  // פשוט: שואל 3 שאלות, מציע פעולות
+  const leaves = document.querySelector('input[name="ha_leaves"]:checked');
+  const growth = document.querySelector('input[name="ha_growth"]:checked');
+  const soil = document.querySelector('input[name="ha_soil"]:checked');
+  const suggestions = [];
+  if(leaves && leaves.value === 'yellow') suggestions.push('עלים מצהיבים — בדוק דישון (KF MICRO לברזל) והשקיה');
+  if(leaves && leaves.value === 'brown') suggestions.push('קצוות חומים — אפשר עודף מלחים או יובש, שטוף את הקרקע');
+  if(growth && growth.value === 'no') suggestions.push('אין צמיחה חדשה — בדוק אור ודשן (KF-10)');
+  if(soil && soil.value === 'dry') suggestions.push('אדמה יבשה — השקה עכשיו');
+  if(soil && soil.value === 'wet') suggestions.push('אדמה רטובה מדי — תן להתייבש, בדוק ניקוז');
+  if(suggestions.length === 0) suggestions.push('הצמח נראה טוב! המשך כרגיל ✅');
+  $('healthAssessResult').innerHTML = '<div class="card" style="margin-top:10px;padding:12px;background:#f0f7f0">'
+    + '<div class="zone-name">המלצות:</div>'
+    + '<ul style="margin:8px 0;padding-right:20px">' + suggestions.map(s => '<li class="note">' + esc(s) + '</li>').join('') + '</ul></div>';
+  // שמירה בהיסטוריה
+  if(p){
+    if(!Array.isArray(p.history)) p.history = [];
+    p.history.unshift({ id: uid(), type: 'healthcheck', at: new Date().toISOString(), label: suggestions.join('; ') });
+    save();
+  }
+}
 /* ================= מאגר דשנים ================= */
 const FERTILIZERS = [
   { id: 'kf10', name: 'KF-10', type: 'ביו-סטימולנט נוזלי', desc: 'תרכיז אצות, חלבונים, ויטמינים ומיצויי צמחים. משפר קליטת מינרלים ועמידות לעקות חום/קור. מאושר לחקלאות אורגנית.', dosage: 'עדנית 80 ס"מ: 10 מ"ל ב-2.5 ליטר מים, בהגמעה, פעם בחודש.', mixable: true, photo: null },
@@ -1469,6 +1681,58 @@ const FERTILIZERS = [
   { id: 'bbautumn', name: 'דשן סתיו גרגירי', type: 'דשן בשחרור איטי (ערכת אוכמניות)', desc: 'דשן גרגירי לחיזוק הצמח לאחר קטיף ותמיכה במנוחה.', dosage: '50–75 גרם לעציץ 25 ליטר, בתחילת אוגוסט.', mixable: true, photo: 'img/fertilizers/kit-fertilizers.jpg' },
   { id: 'sulfur', name: 'גופרית 99.9%', type: 'מחמצן קרקע', desc: 'גופרית טהורה להורדת pH הקרקע. קריטי לאוכמניות — בלי חומציות נכונה הצמח לא קולט דשן.', dosage: '2.5 כפות לעציץ 25 ליטר, כל 3–4 חודשים (מרץ, יוני, ספטמבר — לא בחורף).', mixable: true, photo: 'img/fertilizers/kit-fertilizers.jpg' },
 ];
+function renderPlanters(){
+  const box = $('plantersList');
+  if(!box) return;
+  const planters = state.planters || [];
+  if(planters.length === 0){
+    box.innerHTML = '<p class="note">אין עדניות עדיין.</p>';
+    return;
+  }
+  box.innerHTML = planters.slice().sort((a,b) => (a.number||0)-(b.number||0)).map(pl => {
+    const plants = planterPlants(pl.id);
+    return '<div class="card" style="margin:8px 0;padding:12px">'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+    + '<span class="chip" style="background:#e8f5e9;font-weight:700">#' + (pl.number || '?') + '</span>'
+    + '<div class="zone-name" style="flex:1">' + esc(pl.name) + '</div>'
+    + '<button class="btn" style="padding:4px 10px;font-size:12px" onclick="openPlanterEdit(\'' + pl.id + '\')">ערוך</button>'
+    + '</div>'
+    + (pl.capacityLiters ? '<div class="note">קיבולת: ' + pl.capacityLiters + ' ליטר</div>' : '')
+    + (pl.soilType ? '<div class="note">אדמה: ' + esc(pl.soilType) + '</div>' : '')
+    + (pl.location ? '<div class="note">מיקום: ' + esc(pl.location) + '</div>' : '')
+    + (plants.length ? '<div class="note" style="margin-top:6px">צמחים: ' + plants.map(p => esc(p.name)).join(', ') + '</div>' : '<div class="note">אין צמחים משויכים</div>')
+    + (pl.notes ? '<div class="note">' + esc(pl.notes) + '</div>' : '')
+    + '</div>';
+  }).join('');
+}
+
+let editingPlanterId = null;
+function openPlanterEdit(planterId){
+  const pl = getPlanter(planterId);
+  if(!pl) return;
+  editingPlanterId = planterId;
+  $('pl_number').value = pl.number || '';
+  $('pl_name').value = pl.name || '';
+  $('pl_capacity').value = pl.capacityLiters || '';
+  $('pl_soil').value = pl.soilType || '';
+  $('pl_location').value = pl.location || '';
+  $('pl_notes').value = pl.notes || '';
+  openModal('planterModal');
+}
+
+function savePlanter(){
+  const pl = getPlanter(editingPlanterId);
+  if(!pl) return;
+  pl.number = Number($('pl_number').value) || pl.number;
+  pl.name = $('pl_name').value.trim() || pl.name;
+  pl.capacityLiters = Number($('pl_capacity').value) || null;
+  pl.soilType = $('pl_soil').value.trim();
+  pl.location = $('pl_location').value.trim();
+  pl.notes = $('pl_notes').value.trim();
+  save(); closeModal('planterModal'); renderAll();
+  toast('העדנית נשמרה');
+}
+
 function renderFertilizers(){
   const box = $('fertList');
   if(!box) return;
@@ -1539,7 +1803,7 @@ function renderSettings(){
 }
 
 /* ================= רינדור כללי ================= */
-function renderAll(){ renderHome(); renderPlants(); renderIrrigation(); renderFertilizers(); renderSettings(); }
+function renderAll(){ renderHome(); renderPlants(); renderPlanters(); renderIrrigation(); renderFertilizers(); renderHealthCheck(); renderSettings(); }
 
 /* ================= טיפול בצמחים ================= */
 function markCare(plantId, type){
@@ -2386,6 +2650,8 @@ buildDaysPicker([]);
     }
   }catch(e){}
 })();
+
+seedPlanters();
 
 renderAll();
 fbInit();
