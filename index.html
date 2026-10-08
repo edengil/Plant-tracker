@@ -966,8 +966,8 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "740967243913",
   appId: "1:740967243913:web:822f8b5590357c36c26658"
 };
-// מפתח reCAPTCHA v3 עבור App Check — מתמלא אוטומטית לאחר ההגדרה בקונסול
-const RECAPTCHA_V3_SITE_KEY = "";
+// App Check עם Fraud Defense (מנוהל ע״י Firebase — ללא מפתח אתר)
+const RECAPTCHA_V3_SITE_KEY = ""; // לא בשימוש — הוחלף ב־Fraud Defense
 let fbAuth = null, fbDb = null, fbUser = null;
 let syncTimer = null, lastSyncAt = null, syncBusy = false;
 let plantHashCache = {};
@@ -976,10 +976,10 @@ function fbInit(){
   if(typeof firebase === 'undefined'){ setSyncStatus('off'); return; }
   try{
     if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-    // App Check — הגנה מפני שימוש לרעה במפתח הציבורי
+    // App Check — הגנה מפני שימוש לרעה במפתח הציבורי (Fraud Defense מנוהל ע״י Firebase)
     try{
-      if(firebase.appCheck && RECAPTCHA_V3_SITE_KEY){
-        firebase.appCheck().activate(new firebase.appCheck.ReCaptchaV3Provider(RECAPTCHA_V3_SITE_KEY));
+      if(firebase.appCheck){
+        firebase.appCheck().activate(new firebase.appCheck.ReCaptchaEnterpriseProvider());
       }
     }catch(e){ /* App Check אופציונלי — האפליקציה עובדת גם בלעדיו */ }
     fbAuth = firebase.auth();
