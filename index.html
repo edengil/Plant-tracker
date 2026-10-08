@@ -302,6 +302,12 @@ main{padding:0 16px;max-width:640px;margin:0 auto}
 #toast.show{opacity:1;transform:translateX(50%) translateY(0)}
 a{color:var(--green-dark)}
 </style>
+<script type="importmap">
+{ "imports": {
+  "firebase-app": "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js",
+  "firebase-ai": "https://www.gstatic.com/firebasejs/12.4.0/firebase-ai.js"
+} }
+</script>
 </head>
 <body>
 
@@ -726,7 +732,9 @@ a{color:var(--green-dark)}
         <div class="form-photo" id="dg_preview" style="margin-bottom:14px"></div>
         <div class="btn-row" style="margin:0 0 14px">
           <button class="btn secondary" id="dg_photoBtn">בחר / צלם תמונה</button>
+          <button class="btn" id="dg_aiBtn" style="display:none">🤖 אבחון AI מהתמונה</button>
         </div>
+        <div id="dg_aiResult" class="note" style="display:none;white-space:pre-line;background:#f0f7f2;border-radius:12px;padding:12px;margin-bottom:14px"></div>
       </div>
       <div class="diag-step" data-step="2" style="display:none">
         <h3 style="font-size:16px">שלב 2 — איפה הבעיה?</h3>
@@ -908,6 +916,38 @@ a{color:var(--green-dark)}
 <script src="https://www.gstatic.com/firebasejs/12.4.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.4.0/firebase-app-check-compat.js"></script>
+<script type="module">
+/* אבחון AI — Firebase AI Logic עם Gemini (מופעל דרך הקונסול, ללא מפתח בקוד) */
+import { getApp } from 'firebase-app';
+import { getAI, getGenerativeModel, GoogleAIBackend } from 'firebase-ai';
+const AI_MODEL = 'gemini-2.5-flash'; // אם נכשל — נופל חזרה לאבחון המקומי
+let aiModel = null;
+function aiReady(){
+  if(aiModel) return aiModel;
+  try{
+    const ai = getAI(getApp(), { backend: new GoogleAIBackend() });
+    aiModel = getGenerativeModel(ai, { model: AI_MODEL });
+    return aiModel;
+  }catch(e){ return null; }
+}
+// dataURL של תמונה -> אבחון בעברית. מחזיר טקסט או null בכישלון.
+window.aiDiagnosePhoto = async function(dataURL, plantName){
+  const model = aiReady();
+  if(!model) return null;
+  try{
+    const base64 = dataURL.split(',')[1];
+    const mime = (dataURL.match(/^data:([^;]+);/) || [])[1] || 'image/jpeg';
+    const prompt = 'אתה מומחה לגידול צמחים. בתמונה צמח מסוג "' + plantName + '". '
+      + 'תאר בעברית (עד 4 שורות): מה הבעיה הנראית אם יש, מה הגורם הסביר, ומה הטיפול המומלץ. '
+      + 'אם הצמח נראה בריא — כתוב זאת בקצרה. בלי כוכביות ובלי עיצוב מיוחד.';
+    const res = await model.generateContent([
+      { text: prompt },
+      { inlineData: { mimeType: mime, data: base64 } }
+    ]);
+    return res.response.text();
+  }catch(e){ return null; }
+};
+</script>
 <script>
 'use strict';
 /* ================= נתונים ================= */
@@ -2751,7 +2791,28 @@ async function handleDiagPhoto(file){
     pendingDiagPhoto = await compressImageFile(file);
     if(diagState) diagState.photo = pendingDiagPhoto;
     $('dg_preview').innerHTML = '<img src="' + pendingDiagPhoto + '" style="width:100%;border-radius:12px" alt="">';
+    $('dg_aiBtn').style.display = '';
+    $('dg_aiResult').style.display = 'none';
   }catch(e){ toast('לא הצלחתי לקרוא את התמונה'); }
+}
+async function runAiDiagnosis(){
+  const btn = $('dg_aiBtn'), box = $('dg_aiResult');
+  if(!pendingDiagPhoto){ toast('צלמו תמונה קודם'); return; }
+  btn.disabled = true; btn.textContent = 'מנתח…';
+  box.style.display = 'block'; box.textContent = 'ה־AI בודק את התמונה…';
+  try{
+    const plantName = ($('diagPlantName') && $('diagPlantName').textContent) || 'צמח';
+    const text = await window.aiDiagnosePhoto(pendingDiagPhoto, plantName);
+    if(text){
+      box.textContent = '🤖 אבחון AI:\n' + text;
+      if(diagState) diagState.aiResult = text;
+    }else{
+      box.textContent = 'ה־AI לא זמין כרגע — המשיכו עם האבחון הידני.';
+    }
+  }catch(e){
+    box.textContent = 'ה־AI לא זמין כרגע — המשיכו עם האבחון הידני.';
+  }
+  btn.disabled = false; btn.textContent = '🤖 אבחון AI מהתמונה';
 }
 function saveDiagnosis(problem){
   const st = diagState;
@@ -2760,8 +2821,10 @@ function saveDiagnosis(problem){
   if(!p) return;
   const label = problem ? problem.name : 'תיעוד בעיה (ללא אבחנה)';
   if(!Array.isArray(p.history)) p.history = [];
-  p.history.unshift({ id: uid(), type: 'diagnosis', at: new Date().toISOString(), label: label,
-    location: st.location, symptoms: st.symptoms.slice() });
+  const entry = { id: uid(), type: 'diagnosis', at: new Date().toISOString(), label: label,
+    location: st.location, symptoms: st.symptoms.slice() };
+  if(st.aiResult) entry.aiResult = st.aiResult;
+  p.history.unshift(entry);
   if(st.photo){
     getJournal(p).push({ id: uid(), date: todayStr(), photo: st.photo, note: 'אבחון: ' + label });
   }
@@ -3064,6 +3127,7 @@ $('d_diagnose').addEventListener('click', () => {
   openDiagnosis(pid);
 });
 $('dg_photoBtn').addEventListener('click', () => $('diagPhotoInput').click());
+$('dg_aiBtn').addEventListener('click', runAiDiagnosis);
 $('diagPhotoInput').addEventListener('change', e => {
   const f = e.target.files && e.target.files[0];
   e.target.value = '';
