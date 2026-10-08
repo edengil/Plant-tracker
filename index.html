@@ -566,6 +566,10 @@ a{color:var(--green-dark)}
       </div>
       <input type="file" class="hidden-input" id="backupImport" accept="application/json,.json">
       <p class="note" id="backupStatus" style="margin-top:10px"></p>
+      <div id="historyWrap" style="display:none;margin-top:12px">
+        <h4 style="margin:0 0 8px">היסטוריית גיבויים אוטומטיים (ענן)</h4>
+        <div id="historyList" class="note">טוען…</div>
+      </div>
     </div>
 
     <div class="card" id="syncCard">
@@ -678,6 +682,8 @@ a{color:var(--green-dark)}
       <button class="btn secondary" id="d_edit">עריכה</button>
       <button class="btn danger" id="d_delete">מחיקת הצמח</button>
     </div>
+    <h3 style="margin-top:20px;font-size:16px;font-weight:800">מדריך גידול 🌱</h3>
+    <div id="d_guide" class="note" style="white-space:pre-line"></div>
     <h3 style="margin-top:20px;font-size:16px;font-weight:800">היסטוריית טיפולים</h3>
     <div id="d_history"></div>
     <h3 style="margin-top:20px;font-size:16px;font-weight:800">יומן גדילה</h3>
@@ -898,9 +904,10 @@ a{color:var(--green-dark)}
 
 <div id="toast"></div>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.4.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.4.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.4.0/firebase-app-check-compat.js"></script>
 <script>
 'use strict';
 /* ================= נתונים ================= */
@@ -959,6 +966,8 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "740967243913",
   appId: "1:740967243913:web:822f8b5590357c36c26658"
 };
+// מפתח reCAPTCHA v3 עבור App Check — מתמלא אוטומטית לאחר ההגדרה בקונסול
+const RECAPTCHA_V3_SITE_KEY = "";
 let fbAuth = null, fbDb = null, fbUser = null;
 let syncTimer = null, lastSyncAt = null, syncBusy = false;
 let plantHashCache = {};
@@ -967,6 +976,12 @@ function fbInit(){
   if(typeof firebase === 'undefined'){ setSyncStatus('off'); return; }
   try{
     if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    // App Check — הגנה מפני שימוש לרעה במפתח הציבורי
+    try{
+      if(firebase.appCheck && RECAPTCHA_V3_SITE_KEY){
+        firebase.appCheck().activate(new firebase.appCheck.ReCaptchaV3Provider(RECAPTCHA_V3_SITE_KEY));
+      }
+    }catch(e){ /* App Check אופציונלי — האפליקציה עובדת גם בלעדיו */ }
     fbAuth = firebase.auth();
     fbDb = firebase.firestore();
     fbAuth.onAuthStateChanged(onAuthChanged);
@@ -1009,8 +1024,55 @@ async function pushCloud(){
     });
     lastSyncAt = new Date();
     setSyncStatus('ok');
+    // גיבוי היסטורי — נשמר פעם ביום לכל היותר
+    saveHistorySnapshot();
   }catch(e){ setSyncStatus('error'); }
   syncBusy = false;
+}
+/* גיבוי ענן אוטומטי עם היסטוריית גרסאות (עד 30 ימים אחורה) */
+let lastSnapshotDay = '';
+async function saveHistorySnapshot(){
+  try{
+    const day = new Date().toISOString().slice(0, 10);
+    if(day === lastSnapshotDay) return;
+    lastSnapshotDay = day;
+    const col = fbDb.collection('users').doc(fbUser.uid).collection('history');
+    await col.doc(day).set({
+      at: new Date().toISOString(),
+      plants: state.plants,
+      zones: state.zones,
+      systemName: state.systemName
+    });
+    // ניקוי גרסאות ישנות — שומר 30 אחרונות
+    const snap = await col.orderBy('at', 'desc').get();
+    const olds = [];
+    snap.forEach((d, i) => { if(i >= 30) olds.push(d.ref.delete()); });
+    if(olds.length) await Promise.all(olds);
+  }catch(e){ /* גיבוי היסטורי לא קריטי — לא חוסם */ }
+}
+async function listHistorySnapshots(){
+  if(!fbUser || !fbDb) return [];
+  try{
+    const snap = await fbDb.collection('users').doc(fbUser.uid).collection('history').orderBy('at', 'desc').limit(30).get();
+    const out = [];
+    snap.forEach(d => out.push(Object.assign({ id: d.id }, d.data())));
+    return out;
+  }catch(e){ return []; }
+}
+async function restoreHistorySnapshot(day){
+  if(!fbUser || !fbDb) return false;
+  try{
+    const d = await fbDb.collection('users').doc(fbUser.uid).collection('history').doc(day).get();
+    if(!d.exists) return false;
+    const h = d.data();
+    if(!confirm('לשחזר את הגיבוי מ־' + day + '? הנתונים הנוכחיים יוחלפו.')) return false;
+    state.plants = h.plants || [];
+    state.zones = h.zones || [];
+    state.systemName = h.systemName || '';
+    save(); schedulePush(); renderAll();
+    toast('הגיבוי שוחזר');
+    return true;
+  }catch(e){ toast('השחזור נכשל'); return false; }
 }
 function mergeCloud(cloud){
   const tombs = {};
@@ -1071,8 +1133,8 @@ async function signInGoogle(){
 function onAuthChanged(user){
   fbUser = user || null;
   updateSyncUI();
-  if(fbUser){ pullCloud().then(() => pushSchedulesToWorker()); }
-  else { setSyncStatus('off'); }
+  if(fbUser){ pullCloud().then(() => pushSchedulesToWorker()); renderHistory(); }
+  else { setSyncStatus('off'); const hw = $('historyWrap'); if(hw) hw.style.display = 'none'; }
 }
 function setSyncStatus(s){
   const dot = $('syncDot'), txt = $('syncStatus');
@@ -1154,6 +1216,24 @@ function plantChips(p){
 }
 
 /* משימות הטיפול של היום (השקיה ידנית + דישון שהגיע זמנן) */
+/* ================= מזג אוויר (Open-Meteo — חינם, ללא מפתח) ================= */
+const WX_LAT = 32.32, WX_LON = 34.85; // נתניה
+let wxCache = { at: 0, rained: false, mm: 0 };
+async function checkRain(){
+  // מחזיר true אם ירד גשם משמעותי ביומיים האחרונים (>= 3 מ"מ)
+  const now = Date.now();
+  if(now - wxCache.at < 3600e3) return wxCache.rained; // מטמון לשעה
+  try{
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + WX_LAT + '&longitude=' + WX_LON
+      + '&daily=precipitation_sum&past_days=2&timezone=Asia%2FJerusalem';
+    const r = await fetch(url);
+    const j = await r.json();
+    const sums = (j.daily && j.daily.precipitation_sum) || [];
+    const mm = sums.reduce((a, b) => a + (b || 0), 0);
+    wxCache = { at: now, rained: mm >= 3, mm: Math.round(mm * 10) / 10 };
+  }catch(e){ /* בלי רשת — לא חוסמים את התזכורות */ }
+  return wxCache.rained;
+}
 function dueTasks(){
   const tasks = [];
   state.plants.forEach(p => {
@@ -1258,14 +1338,17 @@ function renderHome(){
       const isW = t.type === 'water';
       const sub = isW ? 'השקיה' : 'דישון';
       const overText = t.st.never ? 'טרם סומן ביצוע' : (t.st.dueIn < 0 ? ('באיחור של ' + (-t.st.dueIn) + ' ימים') : 'מועד הטיפול היום');
+      const rainNote = (isW && wxCache.rained) ? ' <span style="color:#2980b9">🌧 ירד גשם (' + wxCache.mm + ' מ״מ) — אפשר לדלג</span>' : '';
       return '<div class="task-card"><div class="t-photo"><img src="' + esc(plantImg(t.p)) + '" alt=""></div>'
         + '<div class="t-main"><div class="t-name">' + esc(t.p.name) + '</div>'
-        + '<div class="t-sub ' + (t.st.dueIn < 0 || t.st.never ? 'over' : '') + '">' + sub + ' · ' + esc(overText) + '</div></div>'
+        + '<div class="t-sub ' + (t.st.dueIn < 0 || t.st.never ? 'over' : '') + '">' + sub + ' · ' + esc(overText) + rainNote + '</div></div>'
         + '<button class="done-btn ' + (isW ? '' : 'fert') + '" data-done="' + t.p.id + ':' + t.type + '">בוצע היום</button></div>';
     }).join('');
     tl.querySelectorAll('[data-done]').forEach(b => b.addEventListener('click', () => {
       const parts = b.dataset.done.split(':'); markCare(parts[0], parts[1]);
     }));
+    // בדיקת גשם ברקע — מרענן את התצוגה אם ירד גשם
+    checkRain().then(rained => { if(rained) renderHome(); });
   }
 
   /* השקיה אוטומטית קרובה */
@@ -2375,6 +2458,32 @@ function savePlant(){
   save(); closeModal('plantModal'); renderAll(); toast('הצמח נשמר');
 }
 
+/* מדריכי גידול בעברית — לפי סוג צמח */
+const GUIDES = {
+'לענה': '☀️ שמש: שמש מלאה\n💧 השקיה: בינונית, לתת לאדמה להתייבש בין השקיות\n🌱 דישון: קל, פעם בחודש בעונה\n✂️ טיפ: צמח עמיד מאוד, מתאים לשמש ישירה. לקטום פריחה כדי לחזק עלים.',
+'אוכמניות': '☀️ שמש: שמש מלאה עד חצי צל\n💧 השקיה: מרובה, אדמה לחה תמיד — לא לתת להתייבש\n🌱 דישון: אוהב חומציות! גופרית כל 3–4 חודשים + דשן חומצי\n✂️ טיפ: ראה מדריך מלא במסך הדשנים. חיפוי שבבי אורן עוזר לשמור חומציות.',
+'זוטה לבנה': '☀️ שמש: שמש מלאה עד חצי צל\n💧 השקיה: בינונית, אדמה לחה אך לא רטובה\n🌱 דישון: קל פעם בחודש\n✂️ טיפ: צמח תבלין ארומטי, לקטוף עלים לעידוד צמיחה.',
+'פטרוזיליה': '☀️ שמש: שמש מלאה עד חצי צל\n💧 השקיה: סדירה, אדמה לחה תמיד\n🌱 דישון: קל כל שבועיים\n✂️ טיפ: לקטוף עלים חיצוניים קודם. לא לתת לפרוח — הפריחה ממרירה.',
+'מרווה': '☀️ שמש: שמש מלאה\n💧 השקיה: מועטה! להשקות רק כשהאדמה יבשה — שונאת עודף מים\n🌱 דישון: מינימלי, כמעט לא צריך\n✂️ טיפ: ניקוז מעולה חובה. צמח ים־תיכוני עמיד לבצורת.',
+'נענע': '☀️ שמש: חצי צל עד שמש מלאה\n💧 השקיה: מרובה! אוהבת אדמה לחה תמיד\n🌱 דישון: בינוני, כל שבועיים בעונה\n✂️ טיפ: מתפשטת באגרסיביות — עדיף בעציץ נפרד. לקטום פריחה.',
+'פלפל': '☀️ שמש: שמש מלאה, כמה שיותר\n💧 השקיה: סדירה, אדמה לחה אך לא בוצית\n🌱 דישון: כל שבועיים בעונת הפרי עם דשן עשיר באשלגן\n✂️ טיפ: לתמוך בגבעול כשהפרי כבד. קוטף כשהפלפל מקבל צבע מלא.',
+'בזיליקום': '☀️ שמש: שמש מלאה (6+ שעות)\n💧 השקיה: יומיומית בקיץ, אדמה לחה\n🌱 דישון: קל כל שבועיים\n✂️ טיפ: לקטוף מלמעלה כדי לעודד הסתעפות. להסיר ניצני פריחה מיד!',
+'לוונדר': '☀️ שמש: שמש מלאה\n💧 השקיה: מועטה, רק כשהאדמה יבשה לגמרי\n🌱 דישון: כמעט לא צריך\n✂️ טיפ: ניקוז מעולה קריטי — שונא רגליים רטובות. לגזום אחרי פריחה.',
+'פיקוס': '☀️ שמש: אור בהיר, לא שמש ישירה חזקה\n💧 השקיה: כשהשכבה העליונה יבשה (2–3 ס״מ)\n🌱 דישון: פעם בחודש בעונת הצמיחה\n✂️ טיפ: לא להזיז הרבה — רגיש לשינויי מיקום. לנגב עלים מאבק.',
+'קורדילין': '☀️ שמש: אור בהיר עד חצי צל\n💧 השקיה: בינונית, אדמה לחה קלות\n🌱 דישון: פעם בחודש בעונה\n✂️ טיפ: אוהב לחות — לרסס מים על העלים בימים חמים.',
+'לימונית': '☀️ שמש: שמש מלאה\n💧 השקיה: מרובה, אוהבת לחות\n🌱 דישון: כל שבועיים בעונה — צרכנית כבדה\n✂️ טיפ: לקטוף גבעולים חיצוניים. בחורף להגן מקור.',
+'רוזמרין': '☀️ שמש: שמש מלאה\n💧 השקיה: מועטה! רק כשהאדמה יבשה\n🌱 דישון: מינימלי\n✂️ טיפ: כמו מרווה — ים־תיכוני, שונא עודף מים. ניקוז מעולה.',
+'מליסה': '☀️ שמש: חצי צל עד שמש\n💧 השקיה: סדירה, אדמה לחה\n🌱 דישון: קל פעם בחודש\n✂️ טיפ: לקטוף עלים לעידוד צמיחה. מתפשטת — לשקול עציץ נפרד.',
+'לואיזה': '☀️ שמש: שמש מלאה\n💧 השקיה: סדירה בקיץ, מועטה בחורף\n🌱 דישון: קל בעונה\n✂️ טיפ: נשירה בחורף — נורמלי! תתעורר באביב. לגזום בסוף חורף.',
+'פסיפלורה': '☀️ שמש: שמש מלאה\n💧 השקיה: מרובה! אדמה לחה תמיד\n🌱 דישון: כבדה — דשן כל שבועיים בעונה\n✂️ טיפ: צריכה הדלייה לטיפוס. רגישה לקור — להגן בחורף.'
+};
+function guideForPlant(p){
+  const name = p.name || '';
+  for(const key of Object.keys(GUIDES)){
+    if(name.includes(key)) return GUIDES[key];
+  }
+  return 'מדריך גידול לצמח הזה עדיין לא הוכן.';
+}
 function openDetail(plantId){
   const p = state.plants.find(x => x.id === plantId);
   if(!p) return;
@@ -2393,6 +2502,7 @@ function openDetail(plantId){
   if(p.notes) lines.push('הערות: ' + esc(p.notes));
   $('d_meta').innerHTML = lines.join('<br>');
   $('d_chips').innerHTML = plantChips(p).map(c => '<span class="chip ' + c.cls + '">' + esc(c.text) + '</span>').join('');
+  $('d_guide').textContent = guideForPlant(p);
   $('d_markWater').style.display = p.mode === 'auto' ? 'none' : '';
   const hist = Array.isArray(p.history) ? p.history : [];
   $('d_history').innerHTML = hist.length === 0
@@ -2784,7 +2894,7 @@ function importBackupFile(file){
 }
 
 /* ================= התראות ================= */
-const VAPID_PUBLIC_KEY = 'BF7i7WQHWwjhvzcuDrx5XjIvKt6QP9s0Kq9Mqc4S8oxoASTR5tGGP_w8i_1F0Rn75ZcrzPFCKUHP5B_Tn53ron4';
+const VAPID_PUBLIC_KEY = 'BJEdu0JGAvyFARUjMsqLHj7Y62EABtCZ-Y8bEVMcilRap8kN2IwgqN8BQE3XonS53uyJ3n0wuzTLimVM6I6ENgY';
 function urlB64ToUint8Array(base64String){
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -3016,6 +3126,24 @@ $('backupImport').addEventListener('change', e => {
   e.target.value = '';
   if(f) importBackupFile(f);
 });
+async function renderHistory(){
+  const wrap = $('historyWrap'), list = $('historyList');
+  if(!fbUser || !fbDb){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const items = await listHistorySnapshots();
+  if(!items.length){ list.textContent = 'עדיין אין גיבויים אוטומטיים. גיבוי ראשון יישמר בסנכרון הבא.'; return; }
+  list.innerHTML = items.map(h => {
+    const d = new Date(h.at);
+    const label = d.toLocaleDateString('he-IL', { day:'numeric', month:'numeric', year:'numeric' }) + ' ' + d.toLocaleTimeString('he-IL', { hour:'2-digit', minute:'2-digit' });
+    const n = (h.plants || []).length;
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee">'
+      + '<span>' + esc(label) + ' · ' + n + ' צמחים</span>'
+      + '<button class="btn secondary" style="padding:4px 10px;font-size:12px" data-restore="' + esc(h.id) + '">שחזר</button></div>';
+  }).join('');
+  list.querySelectorAll('[data-restore]').forEach(b => b.addEventListener('click', async () => {
+    if(await restoreHistorySnapshot(b.dataset.restore)) renderHistory();
+  }));
+}
 
 /* ================= אתחול ================= */
 $('dateLine').textContent = new Intl.DateTimeFormat('he-IL', { weekday:'long', day:'numeric', month:'long', year:'numeric' }).format(new Date());
