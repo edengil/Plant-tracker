@@ -550,17 +550,8 @@ a{color:var(--green-dark)}
 
     <div class="card">
       <h3>זיהוי צמחים מצילום</h3>
-      <p class="note">הזיהוי עובד דרך שירות פלנטנט. מדביקים כאן מפתח אישי פעם אחת, והוא נשמר רק בטלפון הזה.</p>
-      <div class="field" style="margin-top:12px">
-        <label for="apiKeyInput">מפתח זיהוי (פלנטנט)</label>
-        <input type="password" id="apiKeyInput" placeholder="הדבק כאן את המפתח" autocomplete="off" dir="ltr">
-      </div>
-      <div class="btn-row">
-        <button class="btn" id="keySave">שמור מפתח</button>
-        <button class="btn danger" id="keyClear">מחק מפתח</button>
-      </div>
-      <p class="note" id="keyStatus" style="margin-top:10px"></p>
-      <p class="note">אין לך מפתח? נרשמים בחינם ומקבלים אחד אישי כאן: <a href="https://my.plantnet.org/signup" target="_blank" rel="noopener">הרשמה לפלנטנט</a></p>
+      <p class="note">הזיהוי עובד אוטומטית דרך AI — בלי מפתח ובלי הרשמה. פשוט מצלמים והאפליקציה מזהה.</p>
+      <p class="note" id="keyStatus" style="margin-top:10px">✅ זיהוי AI פעיל</p>
     </div>
 
     <div class="card">
@@ -675,6 +666,10 @@ a{color:var(--green-dark)}
     <button class="close-x" data-close="detailModal">✕</button>
     <h2 id="d_name">צמח</h2>
     <img class="detail-photo" id="d_photo" alt="">
+    <div class="btn-row" style="margin-top:8px">
+      <button class="btn secondary" id="d_updatePhoto" style="font-size:13px;padding:8px 14px">📷 עדכן תמונה</button>
+    </div>
+    <input type="file" id="d_photoInput" accept="image/*" style="display:none">
     <div id="d_meta" class="note" style="color:var(--text);font-size:14px"></div>
     <div id="d_chips" style="margin-top:10px"></div>
     <div class="btn-row">
@@ -945,6 +940,43 @@ window.aiDiagnosePhoto = async function(dataURL, plantName){
       { inlineData: { mimeType: mime, data: base64 } }
     ]);
     return res.response.text();
+  }catch(e){ return null; }
+// dataURL של תמונה -> זיהוי שם הצמח בעברית. מחזיר {name, scientific} או null.
+window.aiIdentifyPhoto = async function(dataURL){
+  const model = aiReady();
+  if(!model) return null;
+  try{
+    const base64 = dataURL.split(',')[1];
+    const mime = (dataURL.match(/^data:([^;]+);/) || [])[1] || 'image/jpeg';
+    const prompt = 'זהה את הצמח בתמונה. החזר JSON בלבד בפורמט: {"name":"שם עברי","scientific":"שם מדעי לטיני"}. '
+      + 'אם לא בטוח — החזר את הניחוש הטוב ביותר. בלי טקסט נוסף.';
+    const res = await model.generateContent([
+      { text: prompt },
+      { inlineData: { mimeType: mime, data: base64 } }
+    ]);
+    const txt = res.response.text().replace(/```json|```/g, '').trim();
+    const j = JSON.parse(txt);
+    if(j && j.name) return { name: j.name, scientific: j.scientific || '' };
+    return null;
+  }catch(e){ return null; }
+// dataURL של תמונה -> ניתוח מצב בריאות. מחזיר {leaves, growth, healthy, notes} או null.
+window.aiAnalyzeHealth = async function(dataURL, plantName){
+  const model = aiReady();
+  if(!model) return null;
+  try{
+    const base64 = dataURL.split(',')[1];
+    const mime = (dataURL.match(/^data:([^;]+);/) || [])[1] || 'image/jpeg';
+    const prompt = 'אתה מומחה לגידול צמחים. בתמונה צמח מסוג "' + plantName + '". '
+      + 'נתח מהתמונה בלבד והחזר JSON בפורמט: {"leaves":"green|yellow|brown","growth":"yes|no","healthy":true|false,"notes":"משפט קצר בעברית"}. '
+      + 'leaves: צבע העלים הנראה. growth: האם נראית צמיחה חדשה. healthy: האם הצמח נראה בריא בסך הכל. בלי טקסט נוסף.';
+    const res = await model.generateContent([
+      { text: prompt },
+      { inlineData: { mimeType: mime, data: base64 } }
+    ]);
+    const txt = res.response.text().replace(/```json|```/g, '').trim();
+    const j = JSON.parse(txt);
+    if(j && j.leaves) return j;
+    return null;
   }catch(e){ return null; }
 };
 </script>
@@ -2014,11 +2046,24 @@ function renderHealthCheck(){
   const box = $('healthCheckList');
   if(!box) return;
   const needing = plantsNeedingPhoto();
-  if(needing.length === 0){
+  let html = '';
+  // משימות תוספים פתוחות
+  for(const p of state.plants){
+    const tasks = (p.supplementTasks || []).filter(t => !t.done);
+    for(const t of tasks){
+      html += '<div class="card" style="margin:8px 0;padding:10px;display:flex;align-items:center;gap:10px;background:#fff8e6">'
+        + '<img src="' + plantImg(p) + '" style="width:50px;height:50px;border-radius:10px;object-fit:cover">'
+        + '<div style="flex:1"><div class="zone-name" style="font-size:14px">📋 ' + esc(t.label) + '</div>'
+        + '<div class="note">' + esc(p.name) + '</div></div>'
+        + '<button class="btn" onclick="toggleSupplementTask(\'' + p.id + '\',\'' + t.id + '\')">בוצע</button>'
+        + '</div>';
+    }
+  }
+  if(needing.length === 0 && html === ''){
     box.innerHTML = '<p class="note">כל הצמחים מעודכנים ✅</p>';
     return;
   }
-  box.innerHTML = needing.slice(0, 5).map(({ plant: p, reason }) =>
+  html += needing.slice(0, 5).map(({ plant: p, reason }) =>
     '<div class="card" style="margin:8px 0;padding:10px;display:flex;align-items:center;gap:10px">'
     + '<img src="' + plantImg(p) + '" style="width:50px;height:50px;border-radius:10px;object-fit:cover">'
     + '<div style="flex:1"><div class="zone-name" style="font-size:14px">' + esc(p.name) + '</div>'
@@ -2026,6 +2071,19 @@ function renderHealthCheck(){
     + '<button class="btn" onclick="openHealthPhoto(\'' + p.id + '\')">צלם</button>'
     + '</div>'
   ).join('');
+  box.innerHTML = html;
+}
+
+function toggleSupplementTask(plantId, taskId){
+  const p = state.plants.find(x => x.id === plantId);
+  const t = p && (p.supplementTasks || []).find(x => x.id === taskId);
+  if(!t) return;
+  t.done = true;
+  t.doneAt = new Date().toISOString();
+  if(!Array.isArray(p.history)) p.history = [];
+  p.history.unshift({ id: uid(), type: 'fert', at: new Date().toISOString(), label: 'תוספים: ' + t.label });
+  save(); renderAll();
+  toast('סומן כבוצע ✅');
 }
 
 let healthPhotoPlantId = null;
@@ -2059,6 +2117,16 @@ function openHealthAssessment(plantId){
   $('healthAssessImg').src = plantImg(p);
   $('healthAssessResult').innerHTML = '';
   $('healthTreatmentSection').style.display = 'none';
+  // איפוס בחירות קודמות
+  document.querySelectorAll('input[name="ha_leaves"],input[name="ha_growth"],input[name="ha_soil"]').forEach(r => r.checked = false);
+  // ניתוח AI אוטומטי מהתמונה — ממלא מה שאפשר לראות, שואל רק על האדמה
+  const aiNote = document.createElement('div');
+  aiNote.id = 'ha_aiNote';
+  aiNote.className = 'note';
+  aiNote.style.cssText = 'margin-bottom:12px;padding:10px;background:#eef6ff;border-radius:10px';
+  aiNote.textContent = '🤖 ה־AI מנתח את התמונה…';
+  $('healthAssessImg').after(aiNote);
+  runHealthAiAnalysis(p);
   // מילוי סוגי טיפול עם בדיקת מלאי
   $('healthTreatmentType').innerHTML = Object.entries(TREATMENT_FOLLOWUP)
     .map(([k, v]) => {
@@ -2069,6 +2137,35 @@ function openHealthAssessment(plantId){
   $('healthTreatmentType').onchange = updateTreatmentStockWarning;
   updateTreatmentStockWarning();
   openModal('healthAssessModal');
+}
+
+// ניתוח AI של תמונת הצמח — ממלא אוטומטית מה שניתן לראות בתמונה
+async function runHealthAiAnalysis(p){
+  const note = $('ha_aiNote');
+  try{
+    const photo = p.photo || plantImg(p);
+    if(!photo || !photo.startsWith('data:')){ if(note) note.remove(); return; }
+    const result = await window.aiAnalyzeHealth(photo, p.name);
+    if(!result){ if(note) note.remove(); return; }
+    // מילוי אוטומטי של השאלות שה־AI יכול לענות עליהן
+    const leafMap = { green: 'green', yellow: 'yellow', brown: 'brown' };
+    const growthMap = { yes: 'yes', no: 'no' };
+    if(leafMap[result.leaves]){
+      const r = document.querySelector('input[name="ha_leaves"][value="' + leafMap[result.leaves] + '"]');
+      if(r) r.checked = true;
+    }
+    if(growthMap[result.growth]){
+      const r = document.querySelector('input[name="ha_growth"][value="' + growthMap[result.growth] + '"]');
+      if(r) r.checked = true;
+    }
+    if(note){
+      note.innerHTML = '🤖 ה־AI ניתח את התמונה' + (result.notes ? ': ' + esc(result.notes) : '')
+        + '<br><span style="font-size:12px">מילאתי אוטומטית את מה שניתן לראות — נשאר רק לסמן את <b>מצב האדמה</b> (אי אפשר לדעת מתמונה).</span>';
+    }
+    // שמירת תוצאת ה־AI לשימוש בהמלצות
+    $('healthAssessModal').dataset.aiHealthy = result.healthy ? '1' : '0';
+    $('healthAssessModal').dataset.aiNotes = result.notes || '';
+  }catch(e){ if(note) note.remove(); }
 }
 
 function updateTreatmentStockWarning(){
@@ -2100,20 +2197,42 @@ function submitHealthTreatment(){
 
 function submitHealthAssessment(){
   const p = state.plants.find(x => x.id === $('healthAssessModal').dataset.plantId);
-  // פשוט: שואל 3 שאלות, מציע פעולות
+  const modal = $('healthAssessModal');
+  // שאלות: עלים וצמיחה כבר מולאו אוטומטית ע״י AI — המשתמש מסמן רק אדמה
   const leaves = document.querySelector('input[name="ha_leaves"]:checked');
   const growth = document.querySelector('input[name="ha_growth"]:checked');
   const soil = document.querySelector('input[name="ha_soil"]:checked');
   const suggestions = [];
-  if(leaves && leaves.value === 'yellow') suggestions.push('עלים מצהיבים — בדוק דישון (KF MICRO לברזל) והשקיה');
+  const needsSupplements = [];
+  if(leaves && leaves.value === 'yellow'){ suggestions.push('עלים מצהיבים — בדוק דישון (KF MICRO לברזל) והשקיה'); needsSupplements.push('KF MICRO'); }
   if(leaves && leaves.value === 'brown') suggestions.push('קצוות חומים — אפשר עודף מלחים או יובש, שטוף את הקרקע');
-  if(growth && growth.value === 'no') suggestions.push('אין צמיחה חדשה — בדוק אור ודשן (KF-10)');
+  if(growth && growth.value === 'no'){ suggestions.push('אין צמיחה חדשה — בדוק אור ודשן (KF-10)'); needsSupplements.push('KF-10'); }
   if(soil && soil.value === 'dry') suggestions.push('אדמה יבשה — השקה עכשיו');
   if(soil && soil.value === 'wet') suggestions.push('אדמה רטובה מדי — תן להתייבש, בדוק ניקוז');
+  // תובנת AI נוספת
+  const aiNotes = modal.dataset.aiNotes;
+  if(aiNotes && modal.dataset.aiHealthy === '0' && suggestions.length === 0){
+    suggestions.push('ה־AI זיהה בעיה: ' + aiNotes);
+  }
   if(suggestions.length === 0) suggestions.push('הצמח נראה טוב! המשך כרגיל ✅');
-  $('healthAssessResult').innerHTML = '<div class="card" style="margin-top:10px;padding:12px;background:#f0f7f0">'
+  let html = '<div class="card" style="margin-top:10px;padding:12px;background:#f0f7f0">'
     + '<div class="zone-name">המלצות:</div>'
     + '<ul style="margin:8px 0;padding-right:20px">' + suggestions.map(s => '<li class="note">' + esc(s) + '</li>').join('') + '</ul></div>';
+  // משימת תוספים — אם הומלצו תוספים, נוצרת משימה אוטומטית
+  if(p && needsSupplements.length > 0){
+    const uniqSupp = [...new Set(needsSupplements)];
+    if(!Array.isArray(p.supplementTasks)) p.supplementTasks = [];
+    const existing = p.supplementTasks.some(t => !t.done && t.label.includes(uniqSupp[0]));
+    if(!existing){
+      p.supplementTasks.unshift({
+        id: uid(), label: 'הוסף תוספים: ' + uniqSupp.join(' + '),
+        createdAt: new Date().toISOString(), done: false
+      });
+      html += '<div class="card" style="margin-top:10px;padding:12px;background:#fff8e6">'
+        + '<div class="note">📋 נוספה משימה: <b>הוסף תוספים (' + esc(uniqSupp.join(' + ')) + ')</b> — תופיע בדף הראשי.</div></div>';
+    }
+  }
+  $('healthAssessResult').innerHTML = html;
   $('healthTreatmentSection').style.display = '';
   // שמירה בהיסטוריה
   if(p){
@@ -2336,8 +2455,6 @@ function deleteZone(id){
 
 /* ================= רינדור: הגדרות ================= */
 function renderSettings(){
-  $('apiKeyInput').value = state.apiKey || '';
-  $('keyStatus').textContent = state.apiKey ? 'יש מפתח שמור — הזיהוי מצילום פעיל.' : 'לא הוגדר מפתח — הזיהוי מצילום מושבת, הוספה ידנית עובדת כרגיל.';
   renderNotif();
 }
 
@@ -2862,66 +2979,36 @@ function dataURLtoBlob(dataURL){
 async function identifyFromDataURL(dataURL){
   lastIdentifyPhoto = dataURL;
   const body = $('identifyBody');
-  if(!state.apiKey){
-    body.innerHTML = '<p class="note" style="font-size:15px;color:var(--text)">הזיהוי מצילום מושבת כי עדיין לא הוגדר מפתח זיהוי.</p>'
-      + '<p class="note" style="margin-top:8px">אפשר להגדיר מפתח במסך ההגדרות — ההרשמה חינמית. בינתיים, הוספה ידנית עובדת כרגיל.</p>'
-      + '<div class="btn-row"><button class="btn" id="idManual">הוסף ידנית עם התמונה הזו</button>'
-      + '<button class="btn secondary" id="idGoSettings">למסך ההגדרות</button></div>';
-    openModal('identifyModal');
-    $('idManual').addEventListener('click', () => { closeModal('identifyModal'); openPlantForm(null, { photo: lastIdentifyPhoto }); });
-    $('idGoSettings').addEventListener('click', () => { closeModal('identifyModal'); showScreen('settings'); });
-    return;
-  }
-  body.innerHTML = '<div class="spinner"></div><p class="note" style="text-align:center">מזהה את הצמח…</p>';
+  // זיהוי דרך Gemini (AI Logic) — לא דורש מפתח
+  body.innerHTML = '<div class="spinner"></div><p class="note" style="text-align:center">מזהה את הצמח עם AI…</p>';
   openModal('identifyModal');
+  const wireManual = (btnId, extra) => {
+    const b = $(btnId);
+    if(b) b.addEventListener('click', () => { closeModal('identifyModal'); openPlantForm(null, Object.assign({ photo: lastIdentifyPhoto }, extra || {})); });
+  };
   try{
-    const blob = await dataURLtoBlob(dataURL);
-    const fd = new FormData();
-    fd.append('images', blob, 'plant.jpg');
-    fd.append('organs', 'auto');
-    const res = await fetch('https://my-api.plantnet.org/v2/identify/all?api-key=' + encodeURIComponent(state.apiKey), { method:'POST', body: fd });
-    if(!res.ok){
-      if(res.status === 401 || res.status === 403 || res.status === 404) throw new Error('KEY');
-      throw new Error('HTTP ' + res.status);
-    }
-    const json = await res.json();
-    const results = (json && json.results ? json.results : []).slice(0, 5);
-    if(results.length === 0){
-      body.innerHTML = '<p class="note" style="font-size:15px;color:var(--text)">לא נמצאה התאמה טובה לתמונה הזו.</p>'
-        + '<p class="note" style="margin-top:8px">נסו תמונה קרובה וברורה יותר של העלה או הפרח, או הוסיפו את הצמח ידנית.</p>'
-        + '<div class="btn-row"><button class="btn" id="idManual2">הוסף ידנית עם התמונה</button></div>';
-      $('idManual2').addEventListener('click', () => { closeModal('identifyModal'); openPlantForm(null, { photo: lastIdentifyPhoto }); });
+    const found = await window.aiIdentifyPhoto(dataURL);
+    if(found && found.name){
+      body.innerHTML = '<p class="note" style="margin-bottom:12px">ה־AI זיהה:</p>'
+        + '<div class="card" style="margin:0 0 12px;padding:14px;text-align:center">'
+        + '<div style="font-size:20px;font-weight:800">' + esc(found.name) + '</div>'
+        + (found.scientific ? '<div class="note" style="font-style:italic">' + esc(found.scientific) + '</div>' : '')
+        + '</div>'
+        + '<div class="btn-row"><button class="btn" id="idAccept">הוסף את ' + esc(found.name) + ' לגינה</button>'
+        + '<button class="btn secondary" id="idManualAi">הוסף ידנית במקום</button></div>';
+      wireManual('idAccept', { name: found.name });
+      wireManual('idManualAi');
       return;
     }
-    body.innerHTML = '<p class="note" style="margin-bottom:12px">אלה ההתאמות המובילות. בחרו אחת כדי למלא את שם הצמח:</p>'
-      + results.map((r, i) => {
-          const sp = r.species || {};
-          const scientific = sp.scientificNameWithoutAuthor || sp.scientificName || 'לא ידוע';
-          const common = Array.isArray(sp.commonNames) && sp.commonNames.length ? sp.commonNames[0] : '';
-          const family = sp.family && sp.family.scientificNameWithoutAuthor ? sp.family.scientificNameWithoutAuthor : '';
-          const pct = Math.round((r.score || 0) * 100);
-          return '<button class="match-card" data-match="' + i + '"><span class="m-main"><span class="m-name">' + esc(common || scientific) + '</span>'
-            + '<span class="m-sub" style="display:block">' + esc(scientific) + (family ? ' · ' + esc(family) : '') + '</span></span>'
-            + '<span class="score">' + pct + '%</span></button>';
-        }).join('')
-      + '<div class="btn-row"><button class="btn secondary" id="idManual3">הוסף ידנית במקום זאת</button></div>';
-    body.querySelectorAll('[data-match]').forEach(b => b.addEventListener('click', () => {
-      const r = results[Number(b.dataset.match)];
-      const sp = r.species || {};
-      const chosen = (Array.isArray(sp.commonNames) && sp.commonNames.length ? sp.commonNames[0] : '') || sp.scientificNameWithoutAuthor || sp.scientificName || '';
-      closeModal('identifyModal');
-      openPlantForm(null, { name: chosen, photo: lastIdentifyPhoto });
-    }));
-    $('idManual3').addEventListener('click', () => { closeModal('identifyModal'); openPlantForm(null, { photo: lastIdentifyPhoto }); });
+    throw new Error('no-result');
   }catch(e){
-    const msg = e && e.message === 'KEY'
-      ? 'המפתח שהוגדר לא תקין. בדקו שהעתקתם אותו נכון במסך ההגדרות, או צרו מפתח חדש באתר פלנטנט.'
-      : 'הזיהוי לא הצליח — ייתכן שאין חיבור לרשת כרגע. אפשר לנסות שוב, או להוסיף את הצמח ידנית.';
-    body.innerHTML = '<p class="note" style="font-size:15px;color:var(--text)">' + esc(msg) + '</p>'
-      + '<div class="btn-row"><button class="btn" id="idManual4">הוסף ידנית עם התמונה</button>'
-      + '<button class="btn secondary" id="idClose">סגירה</button></div>';
-    $('idManual4').addEventListener('click', () => { closeModal('identifyModal'); openPlantForm(null, { photo: lastIdentifyPhoto }); });
-    $('idClose').addEventListener('click', () => closeModal('identifyModal'));
+    body.innerHTML = '<p class="note" style="font-size:15px;color:var(--text)">הזיהוי האוטומטי לא הצליח כרגע.</p>'
+      + '<p class="note" style="margin-top:8px">אפשר לנסות שוב עם תמונה ברורה יותר, או להוסיף ידנית.</p>'
+      + '<div class="btn-row"><button class="btn" id="idManual">הוסף ידנית עם התמונה הזו</button>'
+      + '<button class="btn secondary" id="idRetry">נסה שוב</button></div>';
+    wireManual('idManual');
+    const rb = $('idRetry');
+    if(rb) rb.addEventListener('click', () => identifyFromDataURL(dataURL));
   }
 }
 
@@ -3088,6 +3175,24 @@ document.querySelectorAll('input[name="fmode"]').forEach(r => r.addEventListener
 $('plantSave').addEventListener('click', savePlant);
 
 $('d_markWater').addEventListener('click', () => markCare($('detailModal').dataset.plantId, 'water'));
+$('d_updatePhoto').addEventListener('click', () => $('d_photoInput').click());
+$('d_photoInput').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if(!f) return;
+  const p = state.plants.find(x => x.id === $('detailModal').dataset.plantId);
+  if(!p) return;
+  try{
+    if(!Array.isArray(p.photoHistory)) p.photoHistory = [];
+    if(p.photo) p.photoHistory.unshift({ at: p.lastPhotoAt || new Date().toISOString(), photo: p.photo });
+    p.photo = await compressImageFile(f);
+    p.lastPhotoAt = new Date().toISOString();
+    if(!Array.isArray(p.history)) p.history = [];
+    p.history.unshift({ id: uid(), type: 'photo', at: new Date().toISOString(), label: 'תמונה עודכנה' });
+    save(); openDetail(p.id); renderAll();
+    toast('התמונה עודכנה ✅');
+  }catch(err){ toast('לא הצלחתי לקרוא את התמונה'); }
+});
 $('d_markFert').addEventListener('click', () => markCare($('detailModal').dataset.plantId, 'fert'));
 $('d_edit').addEventListener('click', () => {
   const id = $('detailModal').dataset.plantId;
@@ -3160,15 +3265,6 @@ $('tuyaSaveId').addEventListener('click', () => {
 });
 
 /* הגדרות */
-$('keySave').addEventListener('click', () => {
-  state.apiKey = $('apiKeyInput').value.trim();
-  save(); renderSettings();
-  toast(state.apiKey ? 'המפתח נשמר' : 'לא הוזן מפתח');
-});
-$('keyClear').addEventListener('click', () => {
-  state.apiKey = '';
-  save(); renderSettings(); toast('המפתח נמחק');
-});
 $('notifEnable').addEventListener('click', enableNotifications);
 $('notifTest').addEventListener('click', testNotification);
 $('notifCopy').addEventListener('click', async () => {
