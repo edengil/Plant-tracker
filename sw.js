@@ -1,5 +1,5 @@
 /* מעקב צמחים — Service Worker: שומר את קבצי האפליקציה לזמינות לא מקוונת */
-const CACHE_NAME = 'plant-tracker-v37';
+const CACHE_NAME = 'plant-tracker-v38';
 const APP_SHELL = [
   './',
   './index.html',
@@ -29,7 +29,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   // רק בקשות מקומיות של האפליקציה עצמה עוברות דרך המטמון.
-  // קריאות חיצוניות (למשל זיהוי פלנטנט) עוברות ישירות לרשת.
+  // קריאות חיצוניות (בינה מלאכותית, מזג אוויר, שרת ההשקיה) עוברות ישירות לרשת.
   if (url.origin !== self.location.origin || event.request.method !== 'GET') return;
   const isDoc = url.pathname.endsWith('/') || url.pathname.endsWith('.html');
   event.respondWith((async () => {

@@ -9,6 +9,18 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="מעקב צמחים">
 <title>מעקב צמחים</title>
+<script>
+/* מאגר שגיאות מוקדם — נאסף לפני טעינת האפליקציה ומדווח לשרת (שגיאות בלבד, ללא תוכן משתמש) */
+window.__errBuf = [];
+(function(){
+  function push(msg, src){
+    if(window.__errBuf.length >= 20) return;
+    window.__errBuf.push({ at: new Date().toISOString(), msg: String(msg || '').slice(0, 300), src: String(src || '').slice(0, 120) });
+  }
+  window.addEventListener('error', function(e){ push(e.message, (e.filename || '') + ':' + (e.lineno || '')); }, true);
+  window.addEventListener('unhandledrejection', function(e){ push('promise: ' + (e.reason && e.reason.message || e.reason), ''); });
+})();
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
@@ -282,6 +294,7 @@
       </div>
       <input type="file" class="hidden-input" id="backupImport" accept="application/json,.json">
       <p class="note" id="backupStatus" style="margin-top:10px"></p>
+      <p class="note" id="errLogStatus" style="margin-top:6px"></p>
       <div id="historyWrap" style="display:none;margin-top:12px">
         <h4 style="margin:0 0 8px">היסטוריית גיבויים אוטומטיים (ענן)</h4>
         <div id="historyList" class="note">טוען…</div>
@@ -387,6 +400,7 @@
     <img class="detail-photo" id="d_photo" alt="">
     <div class="btn-row" style="margin-top:8px">
       <button class="btn secondary" id="d_updatePhoto" style="font-size:13px;padding:8px 14px">📷 עדכן תמונה</button>
+      <button class="btn secondary" id="d_refreshGuide" style="font-size:13px;padding:8px 14px;display:none">🔄 רענן המלצות מהמדריך</button>
     </div>
     <input type="file" id="d_photoInput" accept="image/*" style="display:none">
     <div id="d_meta" class="note" style="color:var(--text);font-size:14px"></div>

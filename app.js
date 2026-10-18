@@ -104,11 +104,14 @@ async function pushCloud(){
   try{
     await doc.set({
       plants: state.plants,
+      planters: state.planters || [],
       zones: state.zones,
       systemName: state.systemName,
       tuyaDeviceId: state.tuyaDeviceId || '',
       settingsUpdatedAt: state.settingsUpdatedAt || null,
       deletedPlants: state.deletedPlants || [],
+      clientErrors: storedErrors(),
+      pushSub: state.pushSub || null,
       updatedAt: new Date().toISOString()
     });
     lastSyncAt = new Date();
@@ -129,13 +132,18 @@ async function saveHistorySnapshot(){
     await col.doc(day).set({
       at: new Date().toISOString(),
       plants: state.plants,
+      planters: state.planters || [],
       zones: state.zones,
-      systemName: state.systemName
+      schedules: state.schedules || [],
+      systemName: state.systemName,
+      tuyaDeviceId: state.tuyaDeviceId || '',
+      deletedPlants: state.deletedPlants || []
     });
     // ניקוי גרסאות ישנות — שומר 30 אחרונות
     const snap = await col.orderBy('at', 'desc').get();
-    const olds = [];
-    snap.forEach((d, i) => { if(i >= 30) olds.push(d.ref.delete()); });
+    const docs = [];
+    snap.forEach(d => docs.push(d));
+    const olds = docs.slice(30).map(d => d.ref.delete());
     if(olds.length) await Promise.all(olds);
   }catch(e){ /* גיבוי היסטורי לא קריטי — לא חוסם */ }
 }
@@ -156,8 +164,12 @@ async function restoreHistorySnapshot(day){
     const h = d.data();
     if(!confirm('לשחזר את הגיבוי מ־' + day + '? הנתונים הנוכחיים יוחלפו.')) return false;
     state.plants = h.plants || [];
+    if(Array.isArray(h.planters)) state.planters = h.planters;
     state.zones = h.zones || [];
+    if(Array.isArray(h.schedules)) state.schedules = h.schedules;
     state.systemName = h.systemName || '';
+    if(h.tuyaDeviceId) state.tuyaDeviceId = h.tuyaDeviceId;
+    if(Array.isArray(h.deletedPlants)) state.deletedPlants = h.deletedPlants;
     save(); schedulePush(); renderAll();
     toast('הגיבוי שוחזר');
     return true;
@@ -535,6 +547,16 @@ function renderIrrigation(){
 
 /* ================= בקר השקיה חי (Tuya) ================= */
 const TUYA_PROXY = 'https://plant-tracker-tuya.edengil94.workers.dev';
+
+/* ============ ניטור שגיאות — נשמר מקומית ומסונכרן למסמך הענן של המשתמש ============ */
+function storedErrors(){
+  let prev = [];
+  try{ prev = JSON.parse(localStorage.getItem('pt_errlog') || '[]'); }catch(e){}
+  const buf = (window.__errBuf || []).splice(0); // מרוקן כדי לא לשכפל בקריאות הבאות
+  const merged = buf.concat(prev).slice(0, 20);
+  try{ localStorage.setItem('pt_errlog', JSON.stringify(merged)); }catch(e){}
+  return merged;
+}
 const TUYA_ZONE_NAMES = ['אזור A', 'אזור B', 'אזור C'];
 let tuyaState = null;
 let tuyaCmdBusy = false; // מונע פקודות כפולות כשלוחצים מהר
@@ -1530,6 +1552,13 @@ function deleteZone(id){
 /* ================= רינדור: הגדרות ================= */
 function renderSettings(){
   renderNotif();
+  const el = $('errLogStatus');
+  if(el){
+    const errs = storedErrors();
+    el.textContent = errs.length
+      ? 'ניטור תקלות: נרשמו ' + errs.length + ' שגיאות אחרונות (אחרונה: ' + String(errs[0].msg || '').slice(0, 80) + ')'
+      : 'ניטור תקלות: לא נרשמו שגיאות.';
+  }
 }
 
 /* ================= רינדור כללי ================= */
@@ -1715,6 +1744,36 @@ function guideForPlant(p){
   }
   return 'מדריך גידול לצמח הזה עדיין לא הוכן.';
 }
+/* מרווחי טיפול מומלצים מהמחקר (ימי קיץ) — לרענון צמחים קיימים בלחיצה */
+const GUIDE_INTERVALS = {
+  'לענה': { water: 8, fert: 42 }, 'אוכמניות': { water: 1, fert: 100 },
+  'זוטה לבנה': { water: 3, fert: 30 }, 'פטרוזיליה': { water: 2, fert: 28 },
+  'מרווה': { water: 7, fert: 365 }, 'נענע': { water: 1, fert: 14 },
+  'פלפל': { water: 2, fert: 14 }, 'בזיליקום': { water: 1, fert: 18 },
+  'לוונדר': { water: 7, fert: 365 }, 'פיקוס': { water: 7, fert: 35 },
+  'קורדילין': { water: 3, fert: 18 }, 'לימונית': { water: 3, fert: 10 },
+  'מליסה': { water: 3, fert: 35 }, 'לואיזה': { water: 3, fert: 30 },
+  'רוזמרין': { water: 8, fert: 180 }, 'פסיפלורה': { water: 2, fert: 14 }
+};
+function guideIntervalsFor(p){
+  const name = (p && p.name) || '';
+  for(const key of Object.keys(GUIDE_INTERVALS)){
+    if(name.includes(key)) return GUIDE_INTERVALS[key];
+  }
+  return null;
+}
+function refreshFromGuide(){
+  const id = $('detailModal').dataset.plantId;
+  const p = state.plants.find(x => x.id === id);
+  if(!p) return;
+  const g = guideIntervalsFor(p);
+  if(!g) return;
+  if(!confirm('לעדכן את מרווחי הטיפול לפי המדריך העדכני?\nהשקיה כל ' + g.water + ' ימים, דישון כל ' + g.fert + ' ימים.\n(תאריכי הטיפול האחרון לא ישתנו)')) return;
+  p.waterInterval = g.water;
+  p.fertInterval = g.fert;
+  save(); openDetail(p.id); renderAll();
+  toast('המרווחים עודכנו מהמדריך 🌱');
+}
 function openDetail(plantId){
   const p = state.plants.find(x => x.id === plantId);
   if(!p) return;
@@ -1734,6 +1793,7 @@ function openDetail(plantId){
   $('d_meta').innerHTML = lines.join('<br>');
   $('d_chips').innerHTML = plantChips(p).map(c => '<span class="chip ' + c.cls + '">' + esc(c.text) + '</span>').join('');
   $('d_guide').textContent = guideForPlant(p);
+  $('d_refreshGuide').style.display = guideIntervalsFor(p) ? '' : 'none';
   $('d_markWater').style.display = p.mode === 'auto' ? 'none' : '';
   const hist = Array.isArray(p.history) ? p.history : [];
   $('d_history').innerHTML = hist.length === 0
@@ -2174,6 +2234,8 @@ async function enableNotifications(){
     if(!sub){
       sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY) });
     }
+    // שמירת המנוי במצב — מסונכרן לענן, וקוד הרישום למטה מאפשר שליחה מהשרת
+    state.pushSub = sub.toJSON();
     const json = JSON.stringify(sub.toJSON());
     const code = btoa(unescape(encodeURIComponent(json)));
     state.notif = { enabled: true, code: code, at: new Date().toISOString(), lastDay: (state.notif || {}).lastDay || '' };
@@ -2260,6 +2322,7 @@ $('plantSave').addEventListener('click', savePlant);
 
 $('d_markWater').addEventListener('click', () => markCare($('detailModal').dataset.plantId, 'water'));
 $('d_updatePhoto').addEventListener('click', () => $('d_photoInput').click());
+$('d_refreshGuide').addEventListener('click', refreshFromGuide);
 $('d_photoInput').addEventListener('change', async e => {
   const f = e.target.files && e.target.files[0];
   e.target.value = '';
