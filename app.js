@@ -55,8 +55,8 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "740967243913",
   appId: "1:740967243913:web:822f8b5590357c36c26658"
 };
-// App Check עם Fraud Defense (מנוהל ע״י Firebase — ללא מפתח אתר)
-const RECAPTCHA_V3_SITE_KEY = ""; // לא בשימוש — הוחלף ב־Fraud Defense
+// App Check — Fraud Defense / reCAPTCHA Enterprise (מפתח אתר ציבורי, כפי שרשום בקונסול)
+const RECAPTCHA_SITE_KEY = "6LdKtOQtAAAAAGnRSXMd1lRtHev0z_exeTrROtpU";
 let fbAuth = null, fbDb = null, fbUser = null;
 let syncTimer = null, lastSyncAt = null, syncBusy = false;
 let plantHashCache = {};
@@ -65,12 +65,12 @@ function fbInit(){
   if(typeof firebase === 'undefined'){ setSyncStatus('off'); return; }
   try{
     if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-    // App Check — הגנה מפני שימוש לרעה במפתח הציבורי (Fraud Defense מנוהל ע״י Firebase)
+    // App Check — חובה להעביר את מפתח האתר; בלי המפתח ההפעלה נכשלת וכל בקשות הענן נדחות תחת אכיפה
     try{
       if(firebase.appCheck){
-        firebase.appCheck().activate(new firebase.appCheck.ReCaptchaEnterpriseProvider());
+        firebase.appCheck().activate(new firebase.appCheck.ReCaptchaEnterpriseProvider(RECAPTCHA_SITE_KEY), true);
       }
-    }catch(e){ /* App Check אופציונלי — האפליקציה עובדת גם בלעדיו */ }
+    }catch(e){ if(window.__errBuf) window.__errBuf.push({ msg: 'AppCheck activate: ' + ((e && e.message) || e), src: 'app.js', at: new Date().toISOString() }); }
     fbAuth = firebase.auth();
     fbDb = firebase.firestore();
     fbAuth.onAuthStateChanged(onAuthChanged);
