@@ -648,9 +648,20 @@ window.__errBuf = [];
 /* אבחון AI — Firebase AI Logic עם Gemini (מופעל דרך הקונסול, ללא מפתח בקוד)
    שם המודל נטען מ־Remote Config (פרמטר ai_model) — ניתן להחלפה מרחוק בלי עדכון קוד.
    בכישלון מודל — ניסיון עם מודלי גיבוי. */
-import { getApp } from 'firebase-app';
+import { getApp, initializeApp } from 'firebase-app';
 import { getAI, getGenerativeModel, GoogleAIBackend } from 'firebase-ai';
 import { getRemoteConfig, fetchAndActivate, getString } from 'firebase-remote-config';
+
+// המודול המודולרי לא תמיד רואה את אפליקציית ה־compat — מאתחלים מהצד המודולרי אם חסרה
+const MOD_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCFUS5Kk9FgyVEzzCqXoEAY5kY8EW-hFxM",
+  authDomain: "plant-tracker-85766.firebaseapp.com",
+  projectId: "plant-tracker-85766",
+  storageBucket: "plant-tracker-85766.firebasestorage.app",
+  messagingSenderId: "740967243913",
+  appId: "1:740967243913:web:822f8b5590357c36c26658"
+};
+function modApp(){ try{ return getApp(); }catch(e){ return initializeApp(MOD_FIREBASE_CONFIG); } }
 
 const MODEL_FALLBACKS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 let modelName = MODEL_FALLBACKS[0];
@@ -660,7 +671,7 @@ const modelCache = {};
 function aiInit(){
   if(aiBackend) return aiBackend;
   try{
-    aiBackend = getAI(getApp(), { backend: new GoogleAIBackend() });
+    aiBackend = getAI(modApp(), { backend: new GoogleAIBackend() });
     return aiBackend;
   }catch(e){ return null; }
 }
@@ -676,7 +687,7 @@ function getModel(name){
 // טעינת שם המודל מ־Remote Config (לא חוסם — ברירת המחדל פעילה מיד)
 (async function loadRemoteModel(){
   try{
-    const rc = getRemoteConfig(getApp());
+    const rc = getRemoteConfig(modApp());
     rc.settings.minimumFetchIntervalMillis = 3600000;
     rc.defaultConfig = { ai_model: MODEL_FALLBACKS[0] };
     await fetchAndActivate(rc);
