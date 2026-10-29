@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="he"><head><meta charset="utf-8"><title>AI test</title></head>
+<body>
+<p id="status">loading…</p>
+<pre id="result">pending</pre>
+<iframe id="app" src="index.html" style="width:380px;height:640px"></iframe>
+<script>
+(async function(){
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  try{
+    const resp = await fetch('img/plants/basil.jpg');
+    const blob = await resp.blob();
+    const dataURL = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+    const frame = document.getElementById('app');
+    let fn = null;
+    for(let i = 0; i < 60; i++){
+      try{ fn = frame.contentWindow.aiIdentifyPhoto; }catch(e){}
+      if(typeof fn === 'function') break;
+      await new Promise(r => setTimeout(r, 500));
+    }
+    if(typeof fn !== 'function'){ status.textContent = 'AI function not exposed'; return; }
+    await new Promise(r => setTimeout(r, 5000));
+    status.textContent = 'calling aiIdentifyPhoto…';
+    const out = await fn.call(frame.contentWindow, dataURL);
+    result.textContent = 'RESULT: ' + JSON.stringify(out);
+    status.textContent = 'done';
+  }catch(e){
+    result.textContent = 'ERROR: ' + ((e && e.message) || e);
+    status.textContent = 'failed';
+  }
+})();
+</script>
+</body></html>
