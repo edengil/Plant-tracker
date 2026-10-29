@@ -27,9 +27,9 @@ window.__errBuf = [];
 <link rel="stylesheet" href="style.css">
 <script type="importmap">
 { "imports": {
-  "firebase-app": "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js",
-  "firebase-ai": "https://www.gstatic.com/firebasejs/12.4.0/firebase-ai.js",
-  "firebase-remote-config": "https://www.gstatic.com/firebasejs/12.4.0/firebase-remote-config.js"
+  "firebase-app": "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js",
+  "firebase-ai": "https://www.gstatic.com/firebasejs/13.1.0/firebase-ai.js",
+  "firebase-remote-config": "https://www.gstatic.com/firebasejs/13.1.0/firebase-remote-config.js"
 } }
 </script>
 </head>
@@ -640,10 +640,10 @@ window.__errBuf = [];
 
 <div id="toast"></div>
 
-<script src="https://www.gstatic.com/firebasejs/12.4.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.4.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.4.0/firebase-app-check-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/13.1.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/13.1.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/13.1.0/firebase-app-check-compat.js"></script>
 <script type="module">
 /* אבחון AI — Firebase AI Logic עם Gemini (מופעל דרך הקונסול, ללא מפתח בקוד)
    שם המודל נטען מ־Remote Config (פרמטר ai_model) — ניתן להחלפה מרחוק בלי עדכון קוד.
@@ -652,7 +652,7 @@ import { getApp } from 'firebase-app';
 import { getAI, getGenerativeModel, GoogleAIBackend } from 'firebase-ai';
 import { getRemoteConfig, fetchAndActivate, getString } from 'firebase-remote-config';
 
-const MODEL_FALLBACKS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.5-flash-lite'];
+const MODEL_FALLBACKS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 let modelName = MODEL_FALLBACKS[0];
 let aiBackend = null;
 const modelCache = {};
