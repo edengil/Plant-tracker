@@ -29,6 +29,7 @@ window.__errBuf = [];
 { "imports": {
   "firebase-app": "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js",
   "firebase-ai": "https://www.gstatic.com/firebasejs/13.1.0/firebase-ai.js",
+  "firebase-app-check": "https://www.gstatic.com/firebasejs/13.1.0/firebase-app-check.js",
   "firebase-remote-config": "https://www.gstatic.com/firebasejs/13.1.0/firebase-remote-config.js"
 } }
 </script>
@@ -650,6 +651,7 @@ window.__errBuf = [];
    בכישלון מודל — ניסיון עם מודלי גיבוי. */
 import { getApp, initializeApp } from 'firebase-app';
 import { getAI, getGenerativeModel, GoogleAIBackend } from 'firebase-ai';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase-app-check';
 import { getRemoteConfig, fetchAndActivate, getString } from 'firebase-remote-config';
 
 // המודול המודולרי לא תמיד רואה את אפליקציית ה־compat — מאתחלים מהצד המודולרי אם חסרה
@@ -662,6 +664,13 @@ const MOD_FIREBASE_CONFIG = {
   appId: "1:740967243913:web:822f8b5590357c36c26658"
 };
 function modApp(){ try{ return getApp(); }catch(e){ return initializeApp(MOD_FIREBASE_CONFIG); } }
+// App Check חייב אותחול גם מהצד המודולרי — הפעלת ה־compat לא חלה על קריאות המודול (AI Logic נדחה בלעדיה)
+let appCheckReady = false;
+function ensureAppCheck(){
+  if(appCheckReady) return;
+  appCheckReady = true;
+  try{ initializeAppCheck(modApp(), { provider: new ReCaptchaEnterpriseProvider("6LdKtOQtAAAAAGnRSXMd1lRtHev0z_exeTrROtpU"), isTokenAutoRefreshEnabled: true }); }catch(e){ /* כבר אותחל */ }
+}
 
 const MODEL_FALLBACKS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 let modelName = MODEL_FALLBACKS[0];
@@ -671,6 +680,7 @@ const modelCache = {};
 function aiInit(){
   if(aiBackend) return aiBackend;
   try{
+    ensureAppCheck();
     aiBackend = getAI(modApp(), { backend: new GoogleAIBackend() });
     return aiBackend;
   }catch(e){ return null; }

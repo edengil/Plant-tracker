@@ -1,58 +1,34 @@
 <!DOCTYPE html>
-<html lang="he"><head><meta charset="utf-8"><title>AI diagnostic v3</title>
-<script type="importmap">
-{ "imports": {
-  "firebase-app": "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js",
-  "firebase-ai": "https://www.gstatic.com/firebasejs/13.1.0/firebase-ai.js",
-  "firebase-app-check": "https://www.gstatic.com/firebasejs/13.1.0/firebase-app-check.js"
-} }
-</script>
-</head>
+<html lang="he"><head><meta charset="utf-8"><title>AI test</title></head>
 <body>
-<p id="status">running…</p>
+<p id="status">loading…</p>
 <pre id="result">pending</pre>
-<script type="module">
-import { initializeApp } from 'firebase-app';
-import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken } from 'firebase-app-check';
-import { getAI, getGenerativeModel, GoogleAIBackend } from 'firebase-ai';
-const status = document.getElementById('status');
-const result = document.getElementById('result');
-const lines = [];
-try{
-  const app = initializeApp({
-    apiKey: "AIzaSyCFUS5Kk9FgyVEzzCqXoEAY5kY8EW-hFxM",
-    authDomain: "plant-tracker-85766.firebaseapp.com",
-    projectId: "plant-tracker-85766",
-    storageBucket: "plant-tracker-85766.firebasestorage.app",
-    messagingSenderId: "740967243913",
-    appId: "1:740967243913:web:822f8b5590357c36c26658"
-  });
-  lines.push('app: initialized');
-  const ac = initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider("6LdKtOQtAAAAAGnRSXMd1lRtHev0z_exeTrROtpU"), isTokenAutoRefreshEnabled: true });
-  lines.push('appCheck: initialized');
+<iframe id="app" src="index.html" style="width:380px;height:640px"></iframe>
+<script>
+(async function(){
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
   try{
-    const tok = await getToken(ac, true);
-    lines.push('token: ' + (tok && tok.token ? 'obtained len=' + tok.token.length : 'EMPTY'));
-  }catch(e){ lines.push('token: ERROR ' + ((e && ((e.code||'') + ' ' + (e.message||''))) || e).slice(0, 250)); }
-  const resp = await fetch('img/plants/basil.jpg');
-  const blob = await resp.blob();
-  const dataURL = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
-  const base64 = dataURL.split(',')[1];
-  const ai = getAI(app, { backend: new GoogleAIBackend() });
-  const prompt = 'זהה את הצמח בתמונה. החזר JSON בלבד במבנה {"name": "שם בעברית", "scientific": "שם מדעי"}';
-  for(const name of ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash']){
-    try{
-      const model = getGenerativeModel(ai, { model: name });
-      const res = await model.generateContent([{ text: prompt }, { inlineData: { mimeType: 'image/jpeg', data: base64 } }]);
-      lines.push(name + ' => OK: ' + res.response.text().slice(0, 200));
-    }catch(e){
-      lines.push(name + ' => ERROR: ' + ((e && ((e.code || '') + ' ' + (e.message || ''))) || e).slice(0, 300));
+    const resp = await fetch('img/plants/basil.jpg');
+    const blob = await resp.blob();
+    const dataURL = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+    const frame = document.getElementById('app');
+    let fn = null;
+    for(let i = 0; i < 60; i++){
+      try{ fn = frame.contentWindow.aiIdentifyPhoto; }catch(e){}
+      if(typeof fn === 'function') break;
+      await new Promise(r => setTimeout(r, 500));
     }
+    if(typeof fn !== 'function'){ status.textContent = 'AI function not exposed'; return; }
+    await new Promise(r => setTimeout(r, 5000));
+    status.textContent = 'calling aiIdentifyPhoto…';
+    const out = await fn.call(frame.contentWindow, dataURL);
+    result.textContent = 'RESULT: ' + JSON.stringify(out);
+    status.textContent = 'done';
+  }catch(e){
+    result.textContent = 'ERROR: ' + ((e && e.message) || e);
+    status.textContent = 'failed';
   }
-}catch(e){
-  lines.push('SETUP-ERROR: ' + ((e && e.message) || e));
-}
-result.textContent = lines.join('\n');
-status.textContent = 'done';
+})();
 </script>
 </body></html>
